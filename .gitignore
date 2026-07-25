@@ -1,0 +1,16 @@
+.DS_Store
+.env
+*.log
+
+node_modules/
+dist/
+build/
+backend/paten-kopi
+backend/patenandum
+
+backend/.env
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+storage/backups/*
+!storage/backups/.gitkeep
