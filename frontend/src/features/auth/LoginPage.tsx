@@ -1,7 +1,7 @@
-import { ArrowLeft, Coffee, Lock, User } from 'lucide-react'
+import { Coffee, Lock, User } from 'lucide-react'
 import type { FormEvent } from 'react'
 import { useState } from 'react'
-import { Link, Navigate, useLocation, useNavigate } from 'react-router'
+import { Navigate, useLocation, useNavigate } from 'react-router'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -75,12 +75,6 @@ export function LoginPage() {
 
       <section className="grid place-items-center">
         <div className="w-full max-w-sm">
-          <Button asChild className="mb-6" variant="ghost">
-            <Link to="/">
-              <ArrowLeft aria-hidden="true" className="size-4" />
-              Dashboard
-            </Link>
-          </Button>
           <Card className="border-0 shadow-none lg:border lg:shadow-sm">
             <CardHeader className="text-center lg:text-left">
               <div className="mx-auto mb-4 grid size-12 place-items-center rounded-md bg-primary text-primary-foreground lg:hidden">
