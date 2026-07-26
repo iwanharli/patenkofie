@@ -42,33 +42,33 @@ export function LoginPage() {
 
   return (
     <main className="grid min-h-svh bg-background px-4 py-6 sm:px-6 lg:grid-cols-[1fr_28rem] lg:p-0">
-      <section className="hidden border-r border-border bg-card px-10 py-8 lg:flex lg:flex-col">
-        <Link className="flex items-center gap-3 text-foreground" to="/">
-          <div className="grid size-10 place-items-center rounded-md bg-primary text-primary-foreground">
-            <Coffee aria-hidden="true" className="size-5" />
+      <section className="hidden relative lg:block">
+        <img
+          alt="Coffee Roastery Background"
+          className="absolute inset-0 h-full w-full object-cover"
+          src="/login-bg.png"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/80" />
+        
+        <div className="absolute inset-0 flex flex-col justify-between p-12 text-white">
+          <div className="flex items-center gap-3">
+            <div className="grid size-10 place-items-center rounded-md bg-primary text-primary-foreground">
+              <Coffee aria-hidden="true" className="size-5" />
+            </div>
+            <div>
+              <p className="text-lg font-bold tracking-wide">PatenAndum</p>
+              <p className="text-xs font-medium text-white/70">Admin Operasional</p>
+            </div>
           </div>
-          <div>
-            <p className="text-base font-semibold leading-5">PatenAndum</p>
-            <p className="text-xs text-muted-foreground">Admin operasional</p>
-          </div>
-        </Link>
 
-        <div className="mt-auto max-w-xl">
-          <p className="text-sm font-medium text-muted-foreground">Akses internal</p>
-          <h1 className="mt-3 text-4xl font-semibold tracking-normal">Kelola transaksi kopi harian.</h1>
-          <div className="mt-8 grid grid-cols-3 gap-3">
-            <div className="rounded-lg border border-border bg-background p-4">
-              <p className="text-2xl font-semibold">18</p>
-              <p className="mt-1 text-xs text-muted-foreground">Order</p>
-            </div>
-            <div className="rounded-lg border border-border bg-background p-4">
-              <p className="text-2xl font-semibold">182 kg</p>
-              <p className="mt-1 text-xs text-muted-foreground">Kopi</p>
-            </div>
-            <div className="rounded-lg border border-border bg-background p-4">
-              <p className="text-2xl font-semibold">Tunai</p>
-              <p className="mt-1 text-xs text-muted-foreground">MVP</p>
-            </div>
+          <div className="max-w-xl">
+            <p className="mb-2 text-sm font-medium uppercase tracking-wider text-primary">Akses Internal</p>
+            <h1 className="text-4xl font-semibold leading-tight tracking-normal text-white">
+              Sistem manajemen<br />operasional dan finansial.
+            </h1>
+            <p className="mt-4 text-lg text-white/80">
+              Kelola transaksi, pantau stok, dan cetak laporan roastery dengan mudah dan efisien.
+            </p>
           </div>
         </div>
       </section>
@@ -81,13 +81,13 @@ export function LoginPage() {
               Dashboard
             </Link>
           </Button>
-          <Card>
-            <CardHeader>
-              <div className="mb-3 grid size-11 place-items-center rounded-md bg-primary text-primary-foreground lg:hidden">
-                <Coffee aria-hidden="true" className="size-5" />
+          <Card className="border-0 shadow-none lg:border lg:shadow-sm">
+            <CardHeader className="text-center lg:text-left">
+              <div className="mx-auto mb-4 grid size-12 place-items-center rounded-md bg-primary text-primary-foreground lg:hidden">
+                <Coffee aria-hidden="true" className="size-6" />
               </div>
-              <CardTitle>Masuk ke PatenAndum</CardTitle>
-              <CardDescription>Gunakan akun owner atau petugas.</CardDescription>
+              <CardTitle className="text-2xl">Masuk ke PatenAndum</CardTitle>
+              <CardDescription className="text-base">Gunakan akun owner atau staf kasir.</CardDescription>
             </CardHeader>
             <CardContent>
               <form className="space-y-4" onSubmit={handleSubmit}>

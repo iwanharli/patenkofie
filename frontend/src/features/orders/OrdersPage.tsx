@@ -18,7 +18,7 @@ import {
   type OrderStatus,
 } from '@/features/orders/ordersApi'
 import { OrderStatusBadge, PaymentStatusBadge } from '@/features/orders/status'
-import { formatEnumLabel, formatRupiah } from '@/utils/format'
+import { formatEnumLabel, formatRupiah, WeightText } from '@/utils/format'
 import {
   Select,
   SelectContent,
@@ -371,7 +371,8 @@ export function OrdersPage() {
         {errorMessage && (
           <div className="border-t border-border px-5 py-3 text-sm text-destructive">{errorMessage}</div>
         )}
-        <CardContent className="overflow-x-auto p-0">
+        <CardContent className="p-0">
+          <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[860px] border-collapse text-sm">
             <thead>
               <tr className="border-y border-border bg-muted/70 text-left text-xs font-semibold uppercase text-muted-foreground">
@@ -430,7 +431,7 @@ export function OrdersPage() {
                     <p className="text-xs text-muted-foreground">{order.customer_phone ?? '-'}</p>
                   </td>
                   <td className="px-5 py-4">{order.service_name}</td>
-                  <td className="px-5 py-4">{formatWeight(order.weight_kg)} kg</td>
+                  <td className="px-5 py-4"><WeightText value={order.weight_kg} /></td>
                   <td className="px-5 py-4 font-medium">{formatRupiah(order.total_amount)}</td>
                   <td className="px-5 py-4">
                     <PaymentStatusBadge status={order.payment_status as 'BELUM_BAYAR' | 'DP' | 'LUNAS'} />
@@ -465,6 +466,26 @@ export function OrdersPage() {
               ))}
             </tbody>
           </table>
+          </div>
+
+          <div className="grid gap-3 p-4 md:hidden">
+            {isLoading && (
+              <div className="p-4 text-center text-sm text-muted-foreground">Memuat transaksi dari database...</div>
+            )}
+            {!isLoading && orders.length === 0 && (
+              <div className="p-4 text-center text-sm text-muted-foreground">Belum ada transaksi yang cocok.</div>
+            )}
+            {!isLoading && orders.map((order) => (
+              <OrderMobileCard 
+                isOwner={isOwner} 
+                key={order.order_code} 
+                onDelete={() => void handleDeleteOrder(order)} 
+                onSelect={(checked) => toggleOrderSelection(order.order_code, checked)} 
+                order={order} 
+                selected={selectedOrderSet.has(order.order_code)} 
+              />
+            ))}
+          </div>
         </CardContent>
         <PaginationBar
           onPageChange={setPage}
@@ -510,17 +531,77 @@ function FilterSelect({
   )
 }
 
-function formatWeight(value: string) {
-  return new Intl.NumberFormat('id-ID', {
-    maximumFractionDigits: 3,
-    minimumFractionDigits: 0,
-  }).format(Number(value))
-}
+
 
 function formatShortDate(value: string) {
   return new Intl.DateTimeFormat('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
+    dateStyle: 'medium',
   }).format(new Date(value))
+}
+
+function OrderMobileCard({
+  isOwner,
+  onDelete,
+  onSelect,
+  order,
+  selected,
+}: {
+  isOwner: boolean
+  onDelete: () => void
+  onSelect: (selected: boolean) => void
+  order: OrderRecord
+  selected: boolean
+}) {
+  return (
+    <div className="flex flex-col gap-3 rounded-md border border-border bg-background p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <div className="pt-1">
+            <input
+              aria-label={`Pilih ${order.order_code}`}
+              checked={selected}
+              className="size-4 rounded border-border accent-primary"
+              onChange={(event) => onSelect(event.target.checked)}
+              type="checkbox"
+            />
+          </div>
+          <div className="min-w-0">
+            <p className="font-semibold text-primary">{order.order_code}</p>
+            <p className="mt-1 truncate text-sm text-muted-foreground">{order.customer_name}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{formatShortDate(order.created_at)}</p>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="font-semibold text-foreground">{formatRupiah(order.total_amount)}</p>
+          <p className="mt-1 text-xs text-muted-foreground"><WeightText value={order.weight_kg} /></p>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <PaymentStatusBadge status={order.payment_status as 'BELUM_BAYAR' | 'DP' | 'LUNAS'} />
+        <OrderStatusBadge status={order.order_status as 'DIBATALKAN' | 'DIPROSES' | 'MENUNGGU' | 'SELESAI' | 'SIAP_DIAMBIL'} />
+      </div>
+      <div className="mt-2 flex items-center justify-between">
+        <div className="text-sm font-medium">{order.service_name}</div>
+        <div className="flex justify-end gap-2">
+          <Button asChild size="sm" variant="outline">
+            <Link to={`/orders/${order.order_code}`}>Detail</Link>
+          </Button>
+          {isOwner && (
+            <ConfirmModal
+              confirmLabel="Hapus"
+              description="Transaksi, pembayaran, status log, dan data serah terima terkait akan dihapus dari database."
+              onConfirm={onDelete}
+              title={`Hapus ${order.order_code}?`}
+              trigger={
+                <Button aria-label={`Hapus ${order.order_code}`} size="sm" variant="destructive">
+                  <Trash2 aria-hidden="true" className="size-4" />
+                </Button>
+              }
+              variant="destructive"
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }

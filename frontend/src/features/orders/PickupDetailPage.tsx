@@ -26,7 +26,7 @@ import { fetchOrder, type OrderRecord } from '@/features/orders/ordersApi'
 import { createPickup, fetchPickup, type PickupRecord } from '@/features/orders/pickupsApi'
 import { OrderStatusBadge, PaymentStatusBadge } from '@/features/orders/status'
 import { cn } from '@/lib/utils'
-import { formatEnumLabel } from '@/utils/format'
+import { formatEnumLabel, formatWeight } from '@/utils/format'
 
 export function PickupDetailPage() {
   const params = useParams()
@@ -324,7 +324,7 @@ export function PickupDetailPage() {
             </Link>
           </Button>
         }
-        description={`${order.customer_name} - ${order.service_name} - ${formatWeight(order.weight_kg)} kg`}
+        description={`${order.customer_name} - ${order.service_name} - ${formatWeight(order.weight_kg)}`}
         eyebrow="Serah terima"
         title={order.order_code}
       />
@@ -565,12 +565,7 @@ function formatDate(value: string) {
   }).format(new Date(value))
 }
 
-function formatWeight(value: string) {
-  return new Intl.NumberFormat('id-ID', {
-    maximumFractionDigits: 3,
-    minimumFractionDigits: 0,
-  }).format(Number(value))
-}
+
 
 function formatFileSize(value: number) {
   if (value < 1024 * 1024) {

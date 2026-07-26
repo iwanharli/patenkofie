@@ -1,20 +1,102 @@
-import { ArrowLeft, Printer, ReceiptText } from 'lucide-react'
+import { ArrowLeft, Pencil, Printer, ReceiptText, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 
+import { AppModal } from '@/components/common/AppModal'
+import { ConfirmModal } from '@/components/common/ConfirmModal'
 import { PageHeader } from '@/components/common/PageHeader'
+import { useToast } from '@/components/feedback/useToast'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
+import { useAuth } from '@/features/auth/useAuth'
 import { OrderStatusBadge, PaymentStatusBadge } from '@/features/orders/status'
-import { fetchPayment, type PaymentRecord } from '@/features/payments/paymentsApi'
+import {
+  fetchPayment,
+  type PaymentRecord,
+  updatePayment,
+  voidPayment,
+} from '@/features/payments/paymentsApi'
 import { formatEnumLabel, formatRupiah } from '@/utils/format'
 
 export function PaymentDetailPage() {
   const params = useParams()
+  const navigate = useNavigate()
+  const { toast } = useToast()
+  const { user } = useAuth()
   const [payment, setPayment] = useState<PaymentRecord | null>(null)
   const [isLoading, setIsLoading] = useState(Boolean(params.paymentCode))
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
+  const [editAmount, setEditAmount] = useState('')
+  const [editNotes, setEditNotes] = useState('')
+
+  const isOwner = user?.role === 'OWNER'
+
+  function handleOpenEditModal() {
+    if (!payment) return
+    setEditAmount(String(payment.amount))
+    setEditNotes(payment.notes ?? '')
+    setIsEditModalOpen(true)
+  }
+
+  async function handleSaveEdit() {
+    if (!payment) return
+    const amountVal = parseInt(editAmount, 10)
+    if (isNaN(amountVal) || amountVal <= 0) {
+      toast({
+        description: 'Nominal pembayaran harus lebih besar dari 0.',
+        title: 'Input Tidak Valid',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setIsSavingEdit(true)
+    try {
+      await updatePayment(payment.payment_code, {
+        amount: amountVal,
+        notes: editNotes,
+      })
+      const refreshed = await fetchPayment(payment.payment_code)
+      setPayment(refreshed)
+      setIsEditModalOpen(false)
+      toast({
+        description: `Pembayaran ${payment.payment_code} berhasil dikoreksi.`,
+        title: 'Pembayaran Dikoreksi',
+        variant: 'success',
+      })
+    } catch (error) {
+      toast({
+        description: error instanceof Error ? error.message : 'Gagal mengoreksi pembayaran.',
+        title: 'Koreksi Gagal',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsSavingEdit(false)
+    }
+  }
+
+  async function handleVoidPayment() {
+    if (!payment) return
+    try {
+      await voidPayment(payment.payment_code)
+      toast({
+        description: `Pembayaran ${payment.payment_code} berhasil dibatalkan. Sisa pembayaran order dihitung ulang.`,
+        title: 'Pembayaran Dibatalkan',
+        variant: 'success',
+      })
+      navigate('/payments')
+    } catch (error) {
+      toast({
+        description: error instanceof Error ? error.message : 'Gagal membatalkan pembayaran.',
+        title: 'Pembatalan Gagal',
+        variant: 'destructive',
+      })
+    }
+  }
 
   useEffect(() => {
     let isMounted = true
@@ -80,6 +162,33 @@ export function PaymentDetailPage() {
                 Kembali
               </Link>
             </Button>
+            <Button asChild variant="outline">
+              <Link target="_blank" to={`/print/orders/${payment.order_code}/receipt`}>
+                <Printer aria-hidden="true" className="size-4" />
+                Cetak struk
+              </Link>
+            </Button>
+            {isOwner && (
+              <>
+                <Button onClick={handleOpenEditModal} variant="outline">
+                  <Pencil aria-hidden="true" className="size-4" />
+                  Koreksi Nominal
+                </Button>
+                <ConfirmModal
+                  confirmLabel="Batalkan Pembayaran"
+                  description={`Record pembayaran ${payment.payment_code} sebesar ${formatRupiah(payment.amount)} akan dihapus. Sisa pembayaran transaksi ${payment.order_code} akan dihitung ulang secara otomatis.`}
+                  onConfirm={() => void handleVoidPayment()}
+                  title={`Batalkan Pembayaran ${payment.payment_code}?`}
+                  trigger={
+                    <Button variant="destructive">
+                      <Trash2 aria-hidden="true" className="size-4" />
+                      Batalkan Pembayaran
+                    </Button>
+                  }
+                  variant="destructive"
+                />
+              </>
+            )}
             <Button variant="outline">
               <Printer aria-hidden="true" className="size-4" />
               Cetak
@@ -152,6 +261,45 @@ export function PaymentDetailPage() {
           </Card>
         </div>
       </section>
+
+      <AppModal
+        description="Koreksi nominal tunai atau catatan pembayaran. Sisa pembayaran transaksi akan diperbarui secara otomatis."
+        onOpenChange={setIsEditModalOpen}
+        open={isEditModalOpen}
+        title={`Koreksi Pembayaran ${payment.payment_code}`}
+      >
+        <div className="space-y-4 pt-2">
+          <div>
+            <label className="text-xs font-semibold uppercase text-muted-foreground">Nominal Pembayaran (Rp)</label>
+            <Input
+              className="mt-1"
+              onChange={(e) => setEditAmount(e.target.value)}
+              placeholder="Contoh: 150000"
+              type="number"
+              value={editAmount}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold uppercase text-muted-foreground">Catatan Koreksi</label>
+            <textarea
+              className="mt-1 min-h-[80px] w-full rounded-md border border-input bg-background p-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+              onChange={(e) => setEditNotes(e.target.value)}
+              placeholder="Catatan alasan koreksi"
+              value={editNotes}
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <Button disabled={isSavingEdit} onClick={() => setIsEditModalOpen(false)} variant="outline">
+              Batal
+            </Button>
+            <Button disabled={isSavingEdit} onClick={() => void handleSaveEdit()}>
+              {isSavingEdit ? 'Menyimpan...' : 'Simpan Koreksi'}
+            </Button>
+          </div>
+        </div>
+      </AppModal>
     </>
   )
 }

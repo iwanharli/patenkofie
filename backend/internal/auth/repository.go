@@ -22,7 +22,7 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 func (repo *Repository) FindActiveUserByUsername(ctx context.Context, username string) (User, error) {
 	var user User
 	err := repo.db.QueryRow(ctx, `
-		SELECT id, name, username, password_hash, role, is_active
+		SELECT id, name, username, password_hash, role, avatar_url, is_active, notification_preferences
 		FROM users
 		WHERE username = $1 AND is_active = true
 	`, username).Scan(
@@ -31,7 +31,9 @@ func (repo *Repository) FindActiveUserByUsername(ctx context.Context, username s
 		&user.Username,
 		&user.PasswordHash,
 		&user.Role,
+		&user.AvatarURL,
 		&user.IsActive,
+		&user.NotificationPreferences,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, ErrUserNotFound
@@ -46,7 +48,7 @@ func (repo *Repository) FindActiveUserByUsername(ctx context.Context, username s
 func (repo *Repository) FindActiveUserByID(ctx context.Context, id int64) (User, error) {
 	var user User
 	err := repo.db.QueryRow(ctx, `
-		SELECT id, name, username, password_hash, role, is_active
+		SELECT id, name, username, password_hash, role, avatar_url, is_active, notification_preferences
 		FROM users
 		WHERE id = $1 AND is_active = true
 	`, id).Scan(
@@ -55,7 +57,9 @@ func (repo *Repository) FindActiveUserByID(ctx context.Context, id int64) (User,
 		&user.Username,
 		&user.PasswordHash,
 		&user.Role,
+		&user.AvatarURL,
 		&user.IsActive,
+		&user.NotificationPreferences,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, ErrUserNotFound
@@ -65,4 +69,15 @@ func (repo *Repository) FindActiveUserByID(ctx context.Context, id int64) (User,
 	}
 
 	return user, nil
+}
+
+func (repo *Repository) InsertAuditLog(ctx context.Context, actorID int64, action string, entityType string, entityID string, metadata string) error {
+	_, err := repo.db.Exec(ctx, `
+		INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, metadata)
+		VALUES ($1, $2, $3, $4, $5::jsonb)
+	`, actorID, action, entityType, entityID, metadata)
+	if err != nil {
+		return fmt.Errorf("insert audit log: %w", err)
+	}
+	return nil
 }

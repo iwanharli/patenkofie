@@ -15,7 +15,7 @@ interface MetricCardProps {
   icon: LucideIcon
   label: string
   tone: keyof typeof toneClassNames
-  value: string
+  value: React.ReactNode
 }
 
 export function MetricCard({ detail, icon: Icon, label, tone, value }: MetricCardProps) {

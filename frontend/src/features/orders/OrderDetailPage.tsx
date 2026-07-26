@@ -3,13 +3,16 @@ import {
   Banknote,
   Camera,
   CheckCircle2,
+  History,
   ImageIcon,
   PackageCheck,
+  Pencil,
   Printer,
   QrCode,
   Save,
   Trash2,
   UserRound,
+  ZoomIn,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
@@ -20,6 +23,8 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { useToast } from '@/components/feedback/useToast'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { useAuth } from '@/features/auth/useAuth'
@@ -28,12 +33,14 @@ import {
   fetchOrder,
   type OrderRecord,
   type OrderStatus,
+  updateOrder,
   updateOrderStatus,
 } from '@/features/orders/ordersApi'
 import { fetchPickup, type PickupRecord } from '@/features/orders/pickupsApi'
 import { OrderStatusBadge, PaymentStatusBadge } from '@/features/orders/status'
 import { settleOrderPayment } from '@/features/payments/paymentsApi'
-import { formatEnumLabel, formatRupiah } from '@/utils/format'
+import { fetchServices, type ServiceRecord } from '@/features/settings/servicesApi'
+import { formatEnumLabel, formatRupiah, formatWeight } from '@/utils/format'
 
 const statusOptions: Array<{ description: string; label: string; value: OrderStatus }> = [
   { description: 'Transaksi baru diterima.', label: 'Menunggu', value: 'MENUNGGU' },
@@ -59,12 +66,85 @@ export function OrderDetailPage() {
   const [settleNotes, setSettleNotes] = useState('')
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus>('MENUNGGU')
   const [statusNotes, setStatusNotes] = useState('')
+
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
+  const [servicesList, setServicesList] = useState<ServiceRecord[]>([])
+  const [editServiceCode, setEditServiceCode] = useState('G')
+  const [editWeightValue, setEditWeightValue] = useState('')
+  const [editWeightUnit, setEditWeightUnit] = useState<'KG' | 'GRAM'>('KG')
+  const [editNotes, setEditNotes] = useState('')
+
   const canDelete = user?.role === 'OWNER' && Boolean(order)
+  const canEdit = Boolean(order && (order.order_status === 'MENUNGGU' || order.order_status === 'DIPROSES'))
   const isCompleted = order?.order_status === 'SELESAI'
   const selectedStatusMeta = useMemo(
     () => statusOptions.find((item) => item.value === selectedStatus),
     [selectedStatus],
   )
+
+  function handleOpenEditModal() {
+    if (!order) return
+    setIsLoading(true)
+    fetchServices()
+      .then((items) => {
+        setServicesList(items)
+        setEditServiceCode(order.service_code)
+        setEditWeightValue(order.weight_kg)
+        setEditWeightUnit('KG')
+        setEditNotes(order.notes ?? '')
+        setIsEditModalOpen(true)
+      })
+      .catch(() => {
+        toast({
+          description: 'Gagal memuat daftar layanan dari database.',
+          title: 'Error',
+          variant: 'destructive',
+        })
+      })
+      .finally(() => {
+        setIsLoading(false)
+      })
+  }
+
+  async function handleSaveEdit() {
+    if (!order) return
+    const rawVal = parseFloat(editWeightValue)
+    if (isNaN(rawVal) || rawVal <= 0) {
+      toast({
+        description: 'Berat harus lebih besar dari 0.',
+        title: 'Input Tidak Valid',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    const weightGrams = editWeightUnit === 'KG' ? Math.round(rawVal * 1000) : Math.round(rawVal)
+
+    setIsSavingEdit(true)
+    try {
+      const updated = await updateOrder(order.order_code, {
+        notes: editNotes,
+        service_code: editServiceCode,
+        weight_grams: weightGrams,
+      })
+      setOrder(updated)
+      setIsEditModalOpen(false)
+      toast({
+        description: `Transaksi ${order.order_code} berhasil diperbarui.`,
+        title: 'Transaksi Diperbarui',
+        variant: 'success',
+      })
+    } catch (error) {
+      toast({
+        description: error instanceof Error ? error.message : 'Gagal memperbarui transaksi.',
+        title: 'Update Gagal',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsSavingEdit(false)
+    }
+  }
 
   useEffect(() => {
     let isMounted = true
@@ -250,6 +330,18 @@ export function OrderDetailPage() {
                 Cetak label
               </Link>
             </Button>
+            <Button asChild variant="outline">
+              <Link target="_blank" to={`/print/orders/${order.order_code}/receipt`}>
+                <Printer aria-hidden="true" className="size-4" />
+                Cetak struk
+              </Link>
+            </Button>
+            {canEdit && (
+              <Button onClick={handleOpenEditModal} variant="outline">
+                <Pencil aria-hidden="true" className="size-4" />
+                Ubah Transaksi
+              </Button>
+            )}
             {canDelete && (
               <ConfirmModal
                 confirmLabel="Hapus"
@@ -267,7 +359,7 @@ export function OrderDetailPage() {
             )}
           </>
         }
-        description={`${order.customer_name} - ${order.service_name} - ${formatWeight(order.weight_kg)} kg`}
+        description={`${order.customer_name} - ${order.service_name} - ${formatWeight(order.weight_kg)}`}
         eyebrow="Detail transaksi"
         title={order.order_code}
       />
@@ -288,10 +380,12 @@ export function OrderDetailPage() {
                 <PaymentStatusBadge status={order.payment_status} />
               </div>
             </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Info label="Nama pelanggan" value={order.customer_name} />
               <Info label="Telepon" value={order.customer_phone ?? '-'} />
               <Info label="Kode transaksi" value={order.order_code} />
+              <Info label="Petugas Penerima (Input)" value={order.created_by_name ?? 'Sistem'} />
+              <Info label="Petugas Serah Terima" value={order.picked_up_by_name ?? 'Belum diambil'} />
               <Info label="Tanggal masuk" value={formatDate(order.created_at)} />
               <Info label="Terakhir diubah" value={formatDate(order.updated_at)} />
               <Info label="Catatan" value={order.notes ?? '-'} />
@@ -299,7 +393,7 @@ export function OrderDetailPage() {
           </Card>
 
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between gap-3">
               <div className="flex items-start gap-3">
                 <PanelIcon icon={PackageCheck} />
                 <div>
@@ -307,10 +401,16 @@ export function OrderDetailPage() {
                   <p className="mt-1 text-sm text-muted-foreground">Rincian pekerjaan dan perhitungan harga.</p>
                 </div>
               </div>
+              {canEdit && (
+                <Button onClick={handleOpenEditModal} size="sm" variant="outline">
+                  <Pencil aria-hidden="true" className="size-4" />
+                  Ubah
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Info label="Layanan" value={`${order.service_code} - ${order.service_name}`} />
-              <Info label="Berat masuk" value={`${formatWeight(order.weight_kg)} kg`} />
+              <Info label="Berat masuk" value={formatWeight(order.weight_kg)} />
               <Info label="Harga/kg" value={formatRupiah(order.price_per_kg)} />
               <Info label="Total transaksi" value={formatRupiah(order.total_amount)} />
               <Info label="Level roasting" value={order.roast_level ? formatEnumLabel(order.roast_level) : '-'} />
@@ -357,6 +457,58 @@ export function OrderDetailPage() {
             </CardContent>
           </Card>
 
+          <Card>
+            <CardHeader>
+              <div className="flex items-start gap-3">
+                <PanelIcon icon={History} />
+                <div>
+                  <CardTitle>Riwayat Perubahan Status & Petugas</CardTitle>
+                  <p className="mt-1 text-sm text-muted-foreground">Kronologi pergerakan status pesanan dan petugas perubahnya.</p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {order.status_logs && order.status_logs.length > 0 ? (
+                <div className="overflow-x-auto rounded-md border border-border">
+                  <table className="w-full text-left text-xs font-sans">
+                    <thead className="border-b border-border bg-muted/60 text-muted-foreground uppercase font-semibold">
+                      <tr>
+                        <th className="px-4 py-2.5">Waktu</th>
+                        <th className="px-4 py-2.5">Perubahan Status</th>
+                        <th className="px-4 py-2.5">Petugas Perubah</th>
+                        <th className="px-4 py-2.5">Catatan</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {order.status_logs.map((logItem, idx) => (
+                        <tr className="hover:bg-muted/20" key={idx}>
+                          <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground">
+                            {formatDate(logItem.changed_at)}
+                          </td>
+                          <td className="px-4 py-2.5 whitespace-nowrap font-medium">
+                            <span className="text-muted-foreground">{formatEnumLabel(logItem.previous_status || 'BARU')}</span>
+                            <span className="mx-1.5 text-primary">→</span>
+                            <span className="font-semibold">{formatEnumLabel(logItem.new_status)}</span>
+                          </td>
+                          <td className="px-4 py-2.5 whitespace-nowrap font-semibold">
+                            {logItem.changed_by_name}
+                          </td>
+                          <td className="px-4 py-2.5 text-muted-foreground">
+                            {logItem.notes || '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="rounded-md border border-border bg-muted/30 p-4 text-xs text-muted-foreground">
+                  Belum ada log perubahan status tambahan. Petugas penerima awal: <strong className="text-foreground">{order.created_by_name ?? 'Sistem'}</strong>.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {isCompleted && (
             <Card>
               <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -377,11 +529,27 @@ export function OrderDetailPage() {
               <CardContent className="grid gap-4 lg:grid-cols-[18rem_1fr]">
                 <div className="grid aspect-[4/3] place-items-center rounded-md border border-dashed border-border bg-muted">
                   {pickup?.photo_path ? (
-                    <img
-                      alt={`Bukti pengambilan ${order.order_code}`}
-                      className="h-full w-full rounded-md object-cover"
-                      src={pickup.photo_path}
-                    />
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <button className="group relative h-full w-full overflow-hidden rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                          <img
+                            alt={`Bukti pengambilan ${order.order_code}`}
+                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            src={pickup.photo_path}
+                          />
+                          <div className="absolute inset-0 grid place-items-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
+                            <ZoomIn className="size-8 text-white opacity-80" />
+                          </div>
+                        </button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-5xl border-none bg-transparent p-0 shadow-none">
+                        <img
+                          alt={`Bukti pengambilan ${order.order_code} Fullscreen`}
+                          className="h-auto max-h-[90vh] w-full rounded-md object-contain"
+                          src={pickup.photo_path}
+                        />
+                      </DialogContent>
+                    </Dialog>
                   ) : (
                     <div className="text-center">
                       <ImageIcon aria-hidden="true" className="mx-auto size-10 text-primary" />
@@ -556,6 +724,111 @@ export function OrderDetailPage() {
           </Card>
         </aside>
       </section>
+
+      <AppModal
+        description="Ubah layanan, berat kopi, dan catatan transaksi. Harga total dan sisa pembayaran akan dihitung ulang secara otomatis."
+        onOpenChange={setIsEditModalOpen}
+        open={isEditModalOpen}
+        title={`Ubah Transaksi ${order.order_code}`}
+      >
+        <div className="space-y-4 pt-2">
+          <div>
+            <label className="text-xs font-semibold uppercase text-muted-foreground">Jenis Layanan</label>
+            <Select value={editServiceCode} onValueChange={setEditServiceCode}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Pilih layanan" />
+              </SelectTrigger>
+              <SelectContent>
+                {servicesList.map((srv) => (
+                  <SelectItem key={srv.code} value={srv.code}>
+                    {srv.code} - {srv.name} ({formatRupiah(srv.price_per_kg)}/kg)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold uppercase text-muted-foreground">Berat Kopi</label>
+              <div className="flex items-center gap-1 rounded bg-muted p-0.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setEditWeightUnit('KG')}
+                  className={`rounded px-2 py-0.5 font-medium transition-all ${
+                    editWeightUnit === 'KG'
+                      ? 'bg-background font-semibold text-foreground shadow-xs'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  KG
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditWeightUnit('GRAM')}
+                  className={`rounded px-2 py-0.5 font-medium transition-all ${
+                    editWeightUnit === 'GRAM'
+                      ? 'bg-background font-semibold text-foreground shadow-xs'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Gram
+                </button>
+              </div>
+            </div>
+            <Input
+              className="mt-1"
+              onChange={(e) => setEditWeightValue(e.target.value)}
+              placeholder={editWeightUnit === 'KG' ? 'Misal: 5.5' : 'Misal: 5500'}
+              step="any"
+              type="number"
+              value={editWeightValue}
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold uppercase text-muted-foreground">Catatan</label>
+            <textarea
+              className="mt-1 min-h-[80px] w-full rounded-md border border-input bg-background p-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+              onChange={(e) => setEditNotes(e.target.value)}
+              placeholder="Catatan tambahan (opsional)"
+              value={editNotes}
+            />
+          </div>
+
+          {(() => {
+            const srv = servicesList.find((s) => s.code === editServiceCode)
+            const rawVal = parseFloat(editWeightValue || '0')
+            const grams = editWeightUnit === 'KG' ? Math.round(rawVal * 1000) : Math.round(rawVal)
+            const estTotal = srv && grams > 0 ? Math.round((grams / 1000) * srv.price_per_kg) : 0
+            return (
+              <div className="space-y-1 rounded-md bg-secondary p-3 text-xs font-medium">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Harga Layanan:</span>
+                  <span className="font-semibold">{srv ? `${formatRupiah(srv.price_per_kg)}/kg` : '-'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Total Berat:</span>
+                  <span className="font-semibold">{(grams / 1000).toFixed(3)} kg</span>
+                </div>
+                <div className="flex justify-between border-t border-border/50 pt-1 text-sm font-bold text-primary">
+                  <span>Estimasi Total:</span>
+                  <span>{formatRupiah(estTotal)}</span>
+                </div>
+              </div>
+            )
+          })()}
+
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <Button disabled={isSavingEdit} onClick={() => setIsEditModalOpen(false)} variant="outline">
+              Batal
+            </Button>
+            <Button disabled={isSavingEdit} onClick={() => void handleSaveEdit()}>
+              {isSavingEdit ? 'Menyimpan...' : 'Simpan Perubahan'}
+            </Button>
+          </div>
+        </div>
+      </AppModal>
     </>
   )
 }
@@ -618,9 +891,4 @@ function formatDate(value: string) {
   }).format(new Date(value))
 }
 
-function formatWeight(value: string) {
-  return new Intl.NumberFormat('id-ID', {
-    maximumFractionDigits: 3,
-    minimumFractionDigits: 0,
-  }).format(Number(value))
-}
+

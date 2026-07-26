@@ -233,6 +233,58 @@ func (handler *Handler) BulkUpdateStatus(w http.ResponseWriter, r *http.Request)
 	})
 }
 
+func (handler *Handler) Update(w http.ResponseWriter, r *http.Request) {
+	userID, ok := handler.currentUserID(r)
+	if !ok || userID == 0 {
+		writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "Session tidak valid")
+		return
+	}
+
+	code := chi.URLParam(r, "code")
+
+	var request struct {
+		ServiceCode string `json:"service_code"`
+		WeightGrams int64  `json:"weight_grams"`
+		Notes       string `json:"notes"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		writeError(w, http.StatusBadRequest, "INVALID_JSON", "Request tidak valid")
+		return
+	}
+
+	serviceCode := strings.TrimSpace(request.ServiceCode)
+	if serviceCode == "" {
+		writeError(w, http.StatusBadRequest, "SERVICE_CODE_REQUIRED", "Kode layanan wajib diisi")
+		return
+	}
+	if request.WeightGrams <= 0 {
+		writeError(w, http.StatusBadRequest, "WEIGHT_REQUIRED", "Berat wajib lebih besar dari 0 gram")
+		return
+	}
+
+	item, err := handler.repo.UpdateOrder(r.Context(), code, UpdateOrderInput{
+		ActorID:     userID,
+		Notes:       optionalString(request.Notes),
+		ServiceCode: serviceCode,
+		WeightGrams: request.WeightGrams,
+	})
+	if errors.Is(err, ErrOrderNotFound) {
+		writeError(w, http.StatusNotFound, "ORDER_NOT_FOUND", "Transaksi tidak ditemukan")
+		return
+	}
+	if errors.Is(err, ErrOrderNotEditable) {
+		writeError(w, http.StatusBadRequest, "ORDER_NOT_EDITABLE", "Transaksi yang dapat diubah hanya yang berstatus Menunggu atau Diproses")
+		return
+	}
+	if err != nil {
+		log.Error().Err(err).Str("order_code", code).Msg("update order failed")
+		writeError(w, http.StatusInternalServerError, "UPDATE_ORDER_FAILED", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"data": orderResponse(item)})
+}
+
 func (handler *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	userID, ok := handler.currentUserID(r)
 	if !ok || userID == 0 {

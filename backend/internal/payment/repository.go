@@ -40,18 +40,106 @@ func (repo *Repository) List(ctx context.Context, filter ListFilter, now time.Ti
 		return ListResult{}, err
 	}
 
-	rows, err := repo.db.Query(ctx, `
-		SELECT p.id, p.order_id, o.order_code, c.name, p.payment_type, p.amount,
-			p.payment_method, p.received_by, u.name, p.paid_at, p.notes,
-			o.total_amount, o.paid_amount, (o.total_amount - o.paid_amount),
-			o.payment_status, o.order_status, count(*) OVER() AS total_count
-		FROM payments p
-		JOIN orders o ON o.id = p.order_id
-		JOIN customers c ON c.id = o.customer_id
-		JOIN users u ON u.id = p.received_by
-		ORDER BY p.paid_at DESC, p.id DESC
-		LIMIT $1 OFFSET $2
-	`, filter.Limit, filter.Offset)
+	whereClauses := []string{"1 = 1"}
+	args := []any{}
+
+	if filter.Search != "" {
+		args = append(args, "%"+strings.ToLower(filter.Search)+"%")
+		whereClauses = append(whereClauses, fmt.Sprintf(
+			"(lower(COALESCE(payment_code, '')) LIKE $%d OR lower(order_code) LIKE $%d OR lower(customer_name) LIKE $%d)",
+			len(args), len(args), len(args),
+		))
+	}
+	if filter.RowType != "" {
+		args = append(args, filter.RowType)
+		whereClauses = append(whereClauses, fmt.Sprintf("row_type = $%d", len(args)))
+	}
+	if filter.PaymentType != "" {
+		args = append(args, filter.PaymentType)
+		whereClauses = append(whereClauses, fmt.Sprintf("payment_type = $%d", len(args)))
+	}
+	if filter.PaymentStatus != "" {
+		args = append(args, filter.PaymentStatus)
+		whereClauses = append(whereClauses, fmt.Sprintf("payment_status = $%d", len(args)))
+	}
+	if filter.OrderStatus != "" {
+		args = append(args, filter.OrderStatus)
+		whereClauses = append(whereClauses, fmt.Sprintf("order_status = $%d", len(args)))
+	}
+
+	orderBy := paymentListSortClause(filter.SortBy, filter.SortDirection)
+	args = append(args, filter.Limit, filter.Offset)
+	limitParam := len(args) - 1
+	offsetParam := len(args)
+
+	query := fmt.Sprintf(`
+		WITH list_items AS (
+			SELECT
+				'PAYMENT'::text AS row_type,
+				p.id,
+				('PAY-' || lpad(p.id::text, 6, '0'))::text AS payment_code,
+				p.order_id,
+				o.order_code,
+				c.name AS customer_name,
+				p.payment_type,
+				p.amount,
+				p.payment_method,
+				p.received_by,
+				u.name AS received_by_name,
+				p.paid_at,
+				p.notes,
+				o.total_amount,
+				o.paid_amount,
+				(o.total_amount - o.paid_amount) AS order_remaining,
+				o.payment_status,
+				o.order_status,
+				p.amount AS sort_amount,
+				p.paid_at AS sort_time
+			FROM payments p
+			JOIN orders o ON o.id = p.order_id
+			JOIN customers c ON c.id = o.customer_id
+			JOIN users u ON u.id = p.received_by
+
+			UNION ALL
+
+			SELECT
+				'UNPAID_ORDER'::text AS row_type,
+				o.id,
+				NULL::text AS payment_code,
+				o.id AS order_id,
+				o.order_code,
+				c.name AS customer_name,
+				'UNPAID_ORDER'::text AS payment_type,
+				0::bigint AS amount,
+				''::text AS payment_method,
+				0::bigint AS received_by,
+				''::text AS received_by_name,
+				o.created_at AS paid_at,
+				o.notes,
+				o.total_amount,
+				o.paid_amount,
+				(o.total_amount - o.paid_amount) AS order_remaining,
+				o.payment_status,
+				o.order_status,
+				(o.total_amount - o.paid_amount) AS sort_amount,
+				o.created_at AS sort_time
+			FROM orders o
+			JOIN customers c ON c.id = o.customer_id
+			WHERE o.payment_status = 'BELUM_BAYAR'
+				AND o.order_status NOT IN ('SELESAI', 'DIBATALKAN')
+				AND o.total_amount > o.paid_amount
+		)
+		SELECT row_type, id, order_id, order_code, customer_name, payment_type, amount,
+			payment_method, received_by, received_by_name, paid_at, notes,
+			total_amount, paid_amount, order_remaining, payment_status, order_status,
+			count(*) OVER() AS total_count
+		FROM list_items
+		WHERE %s
+		ORDER BY %s
+		LIMIT $%d OFFSET $%d
+	`, strings.Join(whereClauses, " AND "), orderBy, limitParam, offsetParam)
+
+	rows, err := repo.db.Query(ctx, query, args...)
 	if err != nil {
 		return ListResult{}, fmt.Errorf("list payments: %w", err)
 	}
@@ -76,12 +164,74 @@ func (repo *Repository) List(ctx context.Context, filter ListFilter, now time.Ti
 	}
 
 	if len(result.Items) == 0 {
-		if err := repo.db.QueryRow(ctx, `SELECT count(*) FROM payments`).Scan(&result.Total); err != nil {
+		countQuery := fmt.Sprintf(`
+			WITH list_items AS (
+				SELECT
+					'PAYMENT'::text AS row_type,
+					p.id,
+					('PAY-' || lpad(p.id::text, 6, '0'))::text AS payment_code,
+					o.order_code,
+					c.name AS customer_name,
+					p.payment_type,
+					o.payment_status,
+					o.order_status
+				FROM payments p
+				JOIN orders o ON o.id = p.order_id
+				JOIN customers c ON c.id = o.customer_id
+
+				UNION ALL
+
+				SELECT
+					'UNPAID_ORDER'::text AS row_type,
+					o.id,
+					NULL::text AS payment_code,
+					o.order_code,
+					c.name AS customer_name,
+					'UNPAID_ORDER'::text AS payment_type,
+					o.payment_status,
+					o.order_status
+				FROM orders o
+				JOIN customers c ON c.id = o.customer_id
+				WHERE o.payment_status = 'BELUM_BAYAR'
+					AND o.order_status NOT IN ('SELESAI', 'DIBATALKAN')
+					AND o.total_amount > o.paid_amount
+			)
+			SELECT count(*)
+			FROM list_items
+			WHERE %s
+		`, strings.Join(whereClauses, " AND "))
+		if err := repo.db.QueryRow(ctx, countQuery, args[:len(args)-2]...).Scan(&result.Total); err != nil {
 			return ListResult{}, fmt.Errorf("count payments: %w", err)
 		}
 	}
 
 	return result, nil
+}
+
+func paymentListSortClause(sortBy string, direction string) string {
+	direction = strings.ToUpper(strings.TrimSpace(direction))
+	if direction != "ASC" {
+		direction = "DESC"
+	}
+
+	switch strings.ToLower(strings.TrimSpace(sortBy)) {
+	case "amount":
+		return "sort_amount " + direction + ", sort_time DESC, id DESC"
+	case "code":
+		return "COALESCE(payment_code, order_code) " + direction + ", id DESC"
+	case "customer":
+		return "customer_name " + direction + ", sort_time DESC, id DESC"
+	case "order":
+		return "order_code " + direction + ", id DESC"
+	case "payment_status":
+		return "payment_status " + direction + ", sort_time DESC, id DESC"
+	case "status":
+		return "order_status " + direction + ", sort_time DESC, id DESC"
+	case "type":
+		return "payment_type " + direction + ", sort_time DESC, id DESC"
+	default:
+		return "sort_time " + direction + ", id " + direction
+	}
 }
 
 func (repo *Repository) FindByCode(ctx context.Context, code string) (Payment, error) {
@@ -253,6 +403,7 @@ func (repo *Repository) findByID(ctx context.Context, id int64) (Payment, error)
 	if err != nil {
 		return Payment{}, fmt.Errorf("find payment by id: %w", err)
 	}
+	item.RowType = "PAYMENT"
 	if item.OrderRemaining < 0 {
 		item.OrderRemaining = 0
 	}
@@ -282,6 +433,7 @@ type paymentScanner interface {
 
 func scanPayment(row paymentScanner, item *Payment, total *int64) error {
 	err := row.Scan(
+		&item.RowType,
 		&item.ID,
 		&item.OrderID,
 		&item.OrderCode,
@@ -306,3 +458,211 @@ func scanPayment(row paymentScanner, item *Payment, total *int64) error {
 
 	return nil
 }
+
+func (repo *Repository) IsOwner(ctx context.Context, userID int64) (bool, error) {
+	var role string
+	err := repo.db.QueryRow(ctx, `
+		SELECT role
+		FROM users
+		WHERE id = $1 AND is_active = true
+	`, userID).Scan(&role)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("find user role: %w", err)
+	}
+
+	return role == "OWNER", nil
+}
+
+func (repo *Repository) VoidPayment(ctx context.Context, code string, actorID int64) (Payment, error) {
+	id, err := paymentIDFromCode(code)
+	if err != nil {
+		return Payment{}, ErrPaymentNotFound
+	}
+
+	tx, err := repo.db.Begin(ctx)
+	if err != nil {
+		return Payment{}, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var p struct {
+		ID        int64
+		OrderID   int64
+		Amount    int64
+		PaidAt    time.Time
+		Notes     *string
+		OrderCode string
+	}
+	err = tx.QueryRow(ctx, `
+		SELECT p.id, p.order_id, p.amount, p.paid_at, p.notes, o.order_code
+		FROM payments p
+		JOIN orders o ON o.id = p.order_id
+		WHERE p.id = $1
+		FOR UPDATE OF p
+	`, id).Scan(&p.ID, &p.OrderID, &p.Amount, &p.PaidAt, &p.Notes, &p.OrderCode)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Payment{}, ErrPaymentNotFound
+	}
+	if err != nil {
+		return Payment{}, fmt.Errorf("find payment for void: %w", err)
+	}
+
+	existingPayment, err := repo.findByID(ctx, id)
+	if err != nil {
+		return Payment{}, fmt.Errorf("find payment details: %w", err)
+	}
+
+	var order struct {
+		TotalAmount int64
+		PaidAmount  int64
+	}
+	err = tx.QueryRow(ctx, `
+		SELECT total_amount, paid_amount
+		FROM orders
+		WHERE id = $1
+		FOR UPDATE
+	`, p.OrderID).Scan(&order.TotalAmount, &order.PaidAmount)
+	if err != nil {
+		return Payment{}, fmt.Errorf("find order for void payment: %w", err)
+	}
+
+	newPaidAmount := order.PaidAmount - p.Amount
+	if newPaidAmount < 0 {
+		newPaidAmount = 0
+	}
+
+	newPaymentStatus := "BELUM_BAYAR"
+	if newPaidAmount >= order.TotalAmount {
+		newPaymentStatus = "LUNAS"
+	} else if newPaidAmount > 0 {
+		newPaymentStatus = "DP"
+	}
+
+	_, err = tx.Exec(ctx, `
+		UPDATE orders
+		SET paid_amount = $2, payment_status = $3
+		WHERE id = $1
+	`, p.OrderID, newPaidAmount, newPaymentStatus)
+	if err != nil {
+		return Payment{}, fmt.Errorf("update order paid amount: %w", err)
+	}
+
+	_, err = tx.Exec(ctx, `DELETE FROM payments WHERE id = $1`, p.ID)
+	if err != nil {
+		return Payment{}, fmt.Errorf("delete payment record: %w", err)
+	}
+
+	if actorID > 0 {
+		payload := fmt.Sprintf(`{"payment_code":"PAY-%06d","order_code":"%s","amount":%d}`, p.ID, p.OrderCode, p.Amount)
+		_, _ = tx.Exec(ctx, `
+			INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, metadata)
+			VALUES ($1, 'VOID_PAYMENT', 'payments', $2, $3::jsonb)
+		`, actorID, fmt.Sprintf("%d", p.ID), payload)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return Payment{}, fmt.Errorf("commit void payment tx: %w", err)
+	}
+
+	return existingPayment, nil
+}
+
+func (repo *Repository) UpdatePayment(ctx context.Context, code string, input UpdatePaymentInput) (Payment, error) {
+	id, err := paymentIDFromCode(code)
+	if err != nil {
+		return Payment{}, ErrPaymentNotFound
+	}
+
+	if input.Amount <= 0 {
+		return Payment{}, errors.New("nominal pembayaran harus lebih besar dari 0")
+	}
+
+	tx, err := repo.db.Begin(ctx)
+	if err != nil {
+		return Payment{}, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var p struct {
+		ID        int64
+		OrderID   int64
+		OldAmount int64
+		OrderCode string
+	}
+	err = tx.QueryRow(ctx, `
+		SELECT p.id, p.order_id, p.amount, o.order_code
+		FROM payments p
+		JOIN orders o ON o.id = p.order_id
+		WHERE p.id = $1
+		FOR UPDATE OF p
+	`, id).Scan(&p.ID, &p.OrderID, &p.OldAmount, &p.OrderCode)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Payment{}, ErrPaymentNotFound
+	}
+	if err != nil {
+		return Payment{}, fmt.Errorf("find payment for update: %w", err)
+	}
+
+	var order struct {
+		TotalAmount int64
+		PaidAmount  int64
+	}
+	err = tx.QueryRow(ctx, `
+		SELECT total_amount, paid_amount
+		FROM orders
+		WHERE id = $1
+		FOR UPDATE
+	`, p.OrderID).Scan(&order.TotalAmount, &order.PaidAmount)
+	if err != nil {
+		return Payment{}, fmt.Errorf("find order for payment update: %w", err)
+	}
+
+	diff := input.Amount - p.OldAmount
+	newPaidAmount := order.PaidAmount + diff
+	if newPaidAmount < 0 {
+		newPaidAmount = 0
+	}
+
+	newPaymentStatus := "BELUM_BAYAR"
+	if newPaidAmount >= order.TotalAmount {
+		newPaymentStatus = "LUNAS"
+	} else if newPaidAmount > 0 {
+		newPaymentStatus = "DP"
+	}
+
+	_, err = tx.Exec(ctx, `
+		UPDATE orders
+		SET paid_amount = $2, payment_status = $3
+		WHERE id = $1
+	`, p.OrderID, newPaidAmount, newPaymentStatus)
+	if err != nil {
+		return Payment{}, fmt.Errorf("update order paid amount: %w", err)
+	}
+
+	_, err = tx.Exec(ctx, `
+		UPDATE payments
+		SET amount = $2, notes = $3
+		WHERE id = $1
+	`, p.ID, input.Amount, input.Notes)
+	if err != nil {
+		return Payment{}, fmt.Errorf("update payment record: %w", err)
+	}
+
+	if input.ActorID > 0 {
+		payload := fmt.Sprintf(`{"payment_code":"PAY-%06d","order_code":"%s","old_amount":%d,"new_amount":%d}`, p.ID, p.OrderCode, p.OldAmount, input.Amount)
+		_, _ = tx.Exec(ctx, `
+			INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, metadata)
+			VALUES ($1, 'UPDATE_PAYMENT', 'payments', $2, $3::jsonb)
+		`, input.ActorID, fmt.Sprintf("%d", p.ID), payload)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return Payment{}, fmt.Errorf("commit update payment tx: %w", err)
+	}
+
+	return repo.findByID(ctx, id)
+}
+

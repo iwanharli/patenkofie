@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { DashboardServiceBreakdown } from '@/features/dashboard/dashboardApi'
-import { formatRupiah } from '@/utils/format'
+import { formatRupiah, formatWeight } from '@/utils/format'
 
 export function ServiceBreakdown({ services }: { services: DashboardServiceBreakdown[] }) {
   const maxOrders = Math.max(...services.map((service) => service.order_count), 1)
@@ -17,7 +17,7 @@ export function ServiceBreakdown({ services }: { services: DashboardServiceBreak
               <div className="min-w-0">
                 <p className="text-sm font-medium">{service.service_name}</p>
                 <p className="text-xs text-muted-foreground">
-                  {service.order_count} order · {formatWeight(service.weight_kg)} kg
+                  {service.order_count} order · {formatWeight(service.weight_kg)}
                 </p>
               </div>
               <p className="shrink-0 text-sm font-semibold">{formatRupiah(service.amount)}</p>
@@ -35,9 +35,4 @@ export function ServiceBreakdown({ services }: { services: DashboardServiceBreak
   )
 }
 
-function formatWeight(value: string) {
-  return new Intl.NumberFormat('id-ID', {
-    maximumFractionDigits: 3,
-    minimumFractionDigits: 0,
-  }).format(Number(value))
-}
+

@@ -12,7 +12,7 @@ import { QueueColumn } from '@/features/dashboard/components/QueueColumn'
 import { RecentOrdersTable } from '@/features/dashboard/components/RecentOrdersTable'
 import { ServiceBreakdown } from '@/features/dashboard/components/ServiceBreakdown'
 import { fetchDashboardOverview, type DashboardOverview } from '@/features/dashboard/dashboardApi'
-import { formatRupiah } from '@/utils/format'
+import { formatRupiah, WeightText } from '@/utils/format'
 
 export function DashboardPage() {
   const todayInputValue = getTodayInputValue()
@@ -72,31 +72,36 @@ export function DashboardPage() {
         value: String(dashboard.summary.transactions_today),
       },
       {
-        detail: 'Total berat masuk hari ini',
+        detail: 'Total berat masuk periode ini',
         icon: Scale,
         label: 'Kopi masuk',
         tone: 'blue',
-        value: `${formatWeight(dashboard.summary.coffee_weight_today_kg)} kg`,
+        value: <WeightText value={dashboard.summary.coffee_weight_today_kg} />,
       },
       {
         detail: `${dashboard.summary.cash_payments_today} pembayaran tercatat`,
         icon: Banknote,
         label: 'Kas tunai',
         tone: 'amber',
-        value: formatCompactRupiah(dashboard.summary.cash_amount_today),
+        value: formatRupiah(dashboard.summary.cash_amount_today),
       },
       {
         detail: `${dashboard.summary.outstanding_orders_active} order aktif`,
         icon: WalletCards,
         label: 'Sisa pembayaran',
         tone: 'red',
-        value: formatCompactRupiah(dashboard.summary.outstanding_amount_active),
+        value: formatRupiah(dashboard.summary.outstanding_amount_active),
       },
     ] as const
   }, [dashboard])
 
   return (
-    <>
+    <div className="relative isolate flex flex-col gap-6 pb-8">
+      {/* Subtle modern glow effect for the dashboard */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 flex justify-center overflow-hidden">
+        <div className="h-[400px] w-full max-w-[800px] -translate-y-1/2 rounded-full bg-primary/10 blur-[100px]" />
+      </div>
+
       <PageHeader
         actions={
           <div className="grid w-full gap-2 sm:w-auto sm:grid-cols-[auto_auto_auto]">
@@ -138,16 +143,14 @@ export function DashboardPage() {
             ))}
           </section>
 
-          <section className="grid items-stretch gap-4 xl:grid-cols-[1.45fr_0.8fr]">
-            <div className="flex min-h-0 flex-col gap-4">
-              <div className="grid gap-4 md:grid-cols-3">
-                {dashboard.queues.map((queue) => (
-                  <QueueColumn key={queue.status} {...queue} />
-                ))}
-              </div>
+          <section className="grid gap-4 md:grid-cols-3">
+            {dashboard.queues.map((queue) => (
+              <QueueColumn key={queue.status} {...queue} />
+            ))}
+          </section>
 
-              <RecentOrdersTable className="flex-1" orders={dashboard.recent_orders} />
-            </div>
+          <section className="grid items-stretch gap-4 xl:grid-cols-[1.5fr_1fr]">
+            <RecentOrdersTable orders={dashboard.recent_orders} />
 
             <div className="space-y-4">
               <Card className="overflow-hidden border-primary/20 bg-primary text-primary-foreground">
@@ -186,7 +189,7 @@ export function DashboardPage() {
           </section>
         </>
       ) : null}
-    </>
+    </div>
   )
 }
 
@@ -257,23 +260,6 @@ function formatBusinessDate(value: string) {
   }).format(parseInputDate(value))
 }
 
-function formatCompactRupiah(value: number) {
-  if (value >= 1_000_000) {
-    return `Rp${(value / 1_000_000).toLocaleString('id-ID', {
-      maximumFractionDigits: 2,
-      minimumFractionDigits: 0,
-    })} jt`
-  }
-
-  if (value >= 1_000) {
-    return `Rp${(value / 1_000).toLocaleString('id-ID', {
-      maximumFractionDigits: 0,
-    })} rb`
-  }
-
-  return formatRupiah(value)
-}
-
 function formatSignedNumber(value: number) {
   if (value > 0) {
     return `+${value}`
@@ -282,12 +268,6 @@ function formatSignedNumber(value: number) {
   return String(value)
 }
 
-function formatWeight(value: string) {
-  return new Intl.NumberFormat('id-ID', {
-    maximumFractionDigits: 3,
-    minimumFractionDigits: 0,
-  }).format(Number(value))
-}
 
 function getTodayInputValue() {
   const now = new Date()

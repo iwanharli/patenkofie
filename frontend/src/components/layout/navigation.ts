@@ -3,17 +3,40 @@ import {
   CreditCard,
   LayoutDashboard,
   PackageCheck,
-  QrCode,
   Settings,
   Users,
+  type LucideIcon,
 } from 'lucide-react'
 
-export const navigationItems = [
-  { label: 'Dashboard', icon: LayoutDashboard, href: '/' },
-  { label: 'Transaksi', icon: PackageCheck, href: '/orders' },
-  { label: 'Scan QR', icon: QrCode, href: '/scan' },
-  { label: 'Pelanggan', icon: Users, href: '/customers' },
-  { label: 'Pembayaran', icon: CreditCard, href: '/payments' },
-  { label: 'Laporan', icon: BarChart3, href: '/reports' },
-  { label: 'Pengaturan', icon: Settings, href: '/settings/services' },
+export interface NavigationChild {
+  href: string
+  label: string
+  ownerOnly?: boolean
+}
+
+export interface NavigationItem {
+  children?: NavigationChild[]
+  href?: string
+  icon: LucideIcon
+  label: string
+  showDividerAbove?: boolean
+}
+
+export const navigationItems: NavigationItem[] = [
+  { href: '/', icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/orders', icon: PackageCheck, label: 'Transaksi', showDividerAbove: true },
+  { href: '/payments', icon: CreditCard, label: 'Pembayaran', showDividerAbove: true },
+  { href: '/customers', icon: Users, label: 'Pelanggan' },
+  { href: '/reports', icon: BarChart3, label: 'Laporan', showDividerAbove: true },
+  {
+    children: [
+      { href: '/settings/services', label: 'Harga Layanan', ownerOnly: true },
+      { href: '/settings/profile', label: 'Profil Toko & Backup', ownerOnly: true },
+      { href: '/settings/users', label: 'Pengguna', ownerOnly: true },
+      { href: '/settings/audit', label: 'Audit Log', ownerOnly: true },
+    ],
+    icon: Settings,
+    label: 'Pengaturan',
+    showDividerAbove: true,
+  },
 ]

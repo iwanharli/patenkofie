@@ -59,6 +59,21 @@ func (handler *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ip := r.Header.Get("X-Forwarded-For")
+	if ip == "" {
+		ip = r.Header.Get("X-Real-IP")
+	}
+	if ip == "" {
+		ip = r.RemoteAddr
+	}
+	userAgent := r.UserAgent()
+
+	metadataBytes, _ := json.Marshal(map[string]string{
+		"ip_address": ip,
+		"user_agent": userAgent,
+	})
+	_ = handler.repo.InsertAuditLog(r.Context(), user.ID, "LOGIN", "users", user.Username, string(metadataBytes))
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     SessionCookieName,
 		Value:    session.Token,
@@ -80,6 +95,24 @@ func (handler *Handler) Login(w http.ResponseWriter, r *http.Request) {
 func (handler *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie(SessionCookieName)
 	if err == nil {
+		if session, ok := handler.sessionStore.Get(cookie.Value); ok {
+			if user, errUser := handler.repo.FindActiveUserByID(r.Context(), session.UserID); errUser == nil {
+				ip := r.Header.Get("X-Forwarded-For")
+				if ip == "" {
+					ip = r.Header.Get("X-Real-IP")
+				}
+				if ip == "" {
+					ip = r.RemoteAddr
+				}
+				userAgent := r.UserAgent()
+
+				metadataBytes, _ := json.Marshal(map[string]string{
+					"ip_address": ip,
+					"user_agent": userAgent,
+				})
+				_ = handler.repo.InsertAuditLog(r.Context(), session.UserID, "LOGOUT", "users", user.Username, string(metadataBytes))
+			}
+		}
 		handler.sessionStore.Delete(cookie.Value)
 	}
 
@@ -124,10 +157,12 @@ func (handler *Handler) Me(w http.ResponseWriter, r *http.Request) {
 
 func userResponse(user User) map[string]any {
 	return map[string]any{
-		"id":       user.ID,
-		"name":     user.Name,
-		"username": user.Username,
-		"role":     user.Role,
+		"id":                       user.ID,
+		"name":                     user.Name,
+		"username":                 user.Username,
+		"role":                     user.Role,
+		"avatar_url":               user.AvatarURL,
+		"notification_preferences": user.NotificationPreferences,
 	}
 }
 

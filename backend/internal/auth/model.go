@@ -8,7 +8,9 @@ type User struct {
 	Username     string
 	PasswordHash string
 	Role         string
-	IsActive     bool
+	AvatarURL                *string
+	IsActive                 bool
+	NotificationPreferences  map[string]bool
 }
 
 type Session struct {

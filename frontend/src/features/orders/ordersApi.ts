@@ -14,8 +14,23 @@ export interface CreateOrderPayload {
 export type OrderStatus = 'DIBATALKAN' | 'DIPROSES' | 'MENUNGGU' | 'SELESAI' | 'SIAP_DIAMBIL'
 export type PaymentStatus = 'BELUM_BAYAR' | 'DP' | 'LUNAS'
 
+export interface UpdateOrderPayload {
+  notes: string
+  service_code: string
+  weight_grams: number
+}
+
+export interface OrderStatusLogItem {
+  changed_at: string
+  changed_by_name: string
+  new_status: OrderStatus
+  notes: string
+  previous_status: OrderStatus
+}
+
 export interface OrderRecord {
   created_at: string
+  created_by_name?: string
   customer_id: number
   customer_name: string
   customer_phone: string | null
@@ -26,11 +41,13 @@ export interface OrderRecord {
   order_status: OrderStatus
   paid_amount: number
   payment_status: PaymentStatus
+  picked_up_by_name?: string | null
   price_per_kg: number
   remaining: number
   roast_level: string | null
   service_code: string
   service_name: string
+  status_logs?: OrderStatusLogItem[]
   total_amount: number
   updated_at: string
   weight_kg: string
@@ -151,6 +168,25 @@ export async function updateOrderStatus(code: string, orderStatus: OrderStatus, 
       notes,
       order_status: orderStatus,
     }),
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    method: 'PATCH',
+  })
+
+  if (!response.ok) {
+    const message = await readErrorMessage(response)
+    throw new Error(message)
+  }
+
+  const result = (await response.json()) as OrderResponse
+  return result.data
+}
+
+export async function updateOrder(code: string, payload: UpdateOrderPayload) {
+  const response = await fetch(`/api/v1/orders/${code}`, {
+    body: JSON.stringify(payload),
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',

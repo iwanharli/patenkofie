@@ -3,6 +3,7 @@ package payment
 import "time"
 
 type Payment struct {
+	RowType        string
 	ID             int64
 	OrderID        int64
 	OrderCode      string
@@ -36,11 +37,24 @@ type ListResult struct {
 }
 
 type ListFilter struct {
-	Limit  int
-	Offset int
+	Limit         int
+	Offset        int
+	OrderStatus   string
+	PaymentStatus string
+	PaymentType   string
+	RowType       string
+	Search        string
+	SortBy        string
+	SortDirection string
 }
 
 type SettleOrderInput struct {
 	ActorID int64
+	Notes   *string
+}
+
+type UpdatePaymentInput struct {
+	ActorID int64
+	Amount  int64
 	Notes   *string
 }

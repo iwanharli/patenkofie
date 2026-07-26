@@ -14,6 +14,7 @@ import (
 
 var (
 	ErrBulkOrderStatusMismatch = errors.New("bulk order status mismatch")
+	ErrOrderNotEditable        = errors.New("order not editable")
 	ErrOrderNotFound           = errors.New("order not found")
 )
 
@@ -300,17 +301,23 @@ func (repo *Repository) Create(ctx context.Context, input CreateOrderInput) (Ord
 }
 
 func (repo *Repository) FindByCode(ctx context.Context, code string) (Order, error) {
+	trimmed := strings.TrimSpace(code)
 	var item Order
 	err := repo.db.QueryRow(ctx, `
 		SELECT o.id, o.order_code, o.customer_id, c.name, c.phone, o.service_id, s.code,
 			s.name, o.weight_kg::text, o.price_per_kg, o.total_amount, o.paid_amount,
 			o.payment_status, o.order_status, o.roast_level, o.grind_level, o.notes,
-			o.created_by, o.created_at, o.updated_at
+			o.created_by, COALESCE(uc.name, 'Sistem') AS created_by_name,
+			up.name AS picked_up_by_name,
+			o.created_at, o.updated_at
 		FROM orders o
 		JOIN customers c ON c.id = o.customer_id
 		JOIN services s ON s.id = o.service_id
-		WHERE o.order_code = $1
-	`, code).Scan(
+		LEFT JOIN users uc ON uc.id = o.created_by
+		LEFT JOIN pickups pk ON pk.order_id = o.id
+		LEFT JOIN users up ON up.id = pk.handed_over_by
+		WHERE lower(o.order_code) = lower($1) OR o.id::text = $1
+	`, trimmed).Scan(
 		&item.ID,
 		&item.OrderCode,
 		&item.CustomerID,
@@ -329,6 +336,8 @@ func (repo *Repository) FindByCode(ctx context.Context, code string) (Order, err
 		&item.GrindLevel,
 		&item.Notes,
 		&item.CreatedBy,
+		&item.CreatedByName,
+		&item.PickedUpByName,
 		&item.CreatedAt,
 		&item.UpdatedAt,
 	)
@@ -337,6 +346,31 @@ func (repo *Repository) FindByCode(ctx context.Context, code string) (Order, err
 	}
 	if err != nil {
 		return Order{}, fmt.Errorf("find order by code: %w", err)
+	}
+
+	// Fetch status change history and officer logs
+	logsRows, err := repo.db.Query(ctx, `
+		SELECT
+			osl.previous_status,
+			osl.new_status,
+			COALESCE(u.name, 'Sistem') AS changed_by_name,
+			osl.changed_at,
+			COALESCE(osl.notes, '') AS notes
+		FROM order_status_logs osl
+		LEFT JOIN users u ON u.id = osl.changed_by
+		WHERE osl.order_id = $1
+		ORDER BY osl.changed_at ASC
+	`, item.ID)
+	if err == nil {
+		defer logsRows.Close()
+		logs := make([]OrderStatusLogItem, 0)
+		for logsRows.Next() {
+			var l OrderStatusLogItem
+			if scanErr := logsRows.Scan(&l.PreviousStatus, &l.NewStatus, &l.ChangedByName, &l.ChangedAt, &l.Notes); scanErr == nil {
+				logs = append(logs, l)
+			}
+		}
+		item.StatusLogs = logs
 	}
 
 	return item, nil
@@ -651,3 +685,91 @@ func (repo *Repository) nextDailySequence(ctx context.Context, tx pgx.Tx, busine
 
 	return sequence, nil
 }
+
+func (repo *Repository) UpdateOrder(ctx context.Context, orderCode string, input UpdateOrderInput) (Order, error) {
+	tx, err := repo.db.Begin(ctx)
+	if err != nil {
+		return Order{}, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var current struct {
+		ID            int64
+		PaidAmount    int64
+		OrderStatus   string
+		PaymentStatus string
+	}
+	err = tx.QueryRow(ctx, `
+		SELECT id, paid_amount, order_status, payment_status
+		FROM orders
+		WHERE order_code = $1
+		FOR UPDATE
+	`, orderCode).Scan(
+		&current.ID,
+		&current.PaidAmount,
+		&current.OrderStatus,
+		&current.PaymentStatus,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Order{}, ErrOrderNotFound
+	}
+	if err != nil {
+		return Order{}, fmt.Errorf("find order for update: %w", err)
+	}
+
+	if current.OrderStatus != "MENUNGGU" && current.OrderStatus != "DIPROSES" {
+		return Order{}, ErrOrderNotEditable
+	}
+
+	var serviceID int16
+	var pricePerKg int64
+	err = tx.QueryRow(ctx, `
+		SELECT id, price_per_kg
+		FROM services
+		WHERE code = $1 AND is_active = true
+	`, strings.ToUpper(input.ServiceCode)).Scan(&serviceID, &pricePerKg)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Order{}, errors.New("layanan tidak ditemukan")
+	}
+	if err != nil {
+		return Order{}, fmt.Errorf("find service for update: %w", err)
+	}
+
+	weightKg := float64(input.WeightGrams) / 1000.0
+	if weightKg <= 0 {
+		return Order{}, errors.New("berat harus lebih besar dari 0")
+	}
+
+	totalAmount := int64(math.Round(weightKg * float64(pricePerKg)))
+
+	paymentStatus := "BELUM_BAYAR"
+	if current.PaidAmount >= totalAmount {
+		paymentStatus = "LUNAS"
+	} else if current.PaidAmount > 0 {
+		paymentStatus = "DP"
+	}
+
+	_, err = tx.Exec(ctx, `
+		UPDATE orders
+		SET service_id = $2, weight_kg = $3, total_amount = $4, payment_status = $5, notes = $6
+		WHERE id = $1
+	`, current.ID, serviceID, weightKg, totalAmount, paymentStatus, input.Notes)
+	if err != nil {
+		return Order{}, fmt.Errorf("update order: %w", err)
+	}
+
+	if input.ActorID > 0 {
+		payload := fmt.Sprintf(`{"order_code":"%s","weight_kg":%f,"total_amount":%d}`, orderCode, weightKg, totalAmount)
+		_, _ = tx.Exec(ctx, `
+			INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, metadata)
+			VALUES ($1, 'UPDATE_ORDER', 'orders', $2, $3::jsonb)
+		`, input.ActorID, fmt.Sprintf("%d", current.ID), payload)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return Order{}, fmt.Errorf("commit update order tx: %w", err)
+	}
+
+	return repo.FindByCode(ctx, orderCode)
+}
+

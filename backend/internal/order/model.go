@@ -15,6 +15,13 @@ type CreateOrderInput struct {
 	CreatedBy     int64
 }
 
+type UpdateOrderInput struct {
+	ServiceCode string
+	WeightGrams int64
+	Notes       *string
+	ActorID     int64
+}
+
 type UpdateOrderStatusInput struct {
 	OrderStatus string
 	Notes       *string
@@ -35,27 +42,38 @@ type BulkUpdateOrderStatusResult struct {
 	NotFoundCount  int
 }
 
+type OrderStatusLogItem struct {
+	PreviousStatus string    `json:"previous_status"`
+	NewStatus      string    `json:"new_status"`
+	ChangedByName  string    `json:"changed_by_name"`
+	ChangedAt      time.Time `json:"changed_at"`
+	Notes          string    `json:"notes"`
+}
+
 type Order struct {
-	ID            int64
-	OrderCode     string
-	CustomerID    int64
-	CustomerName  string
-	CustomerPhone *string
-	ServiceID     int16
-	ServiceCode   string
-	ServiceName   string
-	WeightKg      string
-	PricePerKg    int64
-	TotalAmount   int64
-	PaidAmount    int64
-	PaymentStatus string
-	OrderStatus   string
-	RoastLevel    *string
-	GrindLevel    *string
-	Notes         *string
-	CreatedBy     int64
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID             int64                `json:"id"`
+	OrderCode      string               `json:"order_code"`
+	CustomerID     int64                `json:"customer_id"`
+	CustomerName   string               `json:"customer_name"`
+	CustomerPhone  *string              `json:"customer_phone"`
+	ServiceID      int16                `json:"service_id"`
+	ServiceCode    string               `json:"service_code"`
+	ServiceName    string               `json:"service_name"`
+	WeightKg       string               `json:"weight_kg"`
+	PricePerKg     int64                `json:"price_per_kg"`
+	TotalAmount    int64                `json:"total_amount"`
+	PaidAmount     int64                `json:"paid_amount"`
+	PaymentStatus  string               `json:"payment_status"`
+	OrderStatus    string               `json:"order_status"`
+	RoastLevel     *string              `json:"roast_level"`
+	GrindLevel     *string              `json:"grind_level"`
+	Notes          *string              `json:"notes"`
+	CreatedBy      int64                `json:"created_by"`
+	CreatedByName  string               `json:"created_by_name"`
+	PickedUpByName *string              `json:"picked_up_by_name"`
+	CreatedAt      time.Time            `json:"created_at"`
+	UpdatedAt      time.Time            `json:"updated_at"`
+	StatusLogs     []OrderStatusLogItem `json:"status_logs"`
 }
 
 type OrderListResult struct {

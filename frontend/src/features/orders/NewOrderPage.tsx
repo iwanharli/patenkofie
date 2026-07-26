@@ -31,7 +31,7 @@ import {
 import { fetchCustomerSuggestions, type CustomerSuggestionRecord } from '@/features/customers/customersApi'
 import { createOrder, type CreateOrderPayload } from '@/features/orders/ordersApi'
 import { fetchServices, type ServiceRecord } from '@/features/settings/servicesApi'
-import { formatRupiah } from '@/utils/format'
+import { formatRupiah, formatWeight } from '@/utils/format'
 
 export function NewOrderPage() {
   const navigate = useNavigate()
@@ -158,7 +158,7 @@ export function NewOrderPage() {
       })
 
       toast({
-        description: `${order.customer_name} · ${order.service_name} · ${formatWeight(order.weight_kg)} kg`,
+        description: `${order.customer_name} · ${order.service_name} · ${formatWeight(order.weight_kg)}`,
         title: `Transaksi ${order.order_code} dibuat`,
         variant: 'success',
       })
@@ -489,10 +489,6 @@ function formatNumber(value: number) {
     maximumFractionDigits: 3,
     minimumFractionDigits: 0,
   }).format(value)
-}
-
-function formatWeight(value: string) {
-  return formatNumber(Number(value))
 }
 
 function formatShortDate(value: string) {

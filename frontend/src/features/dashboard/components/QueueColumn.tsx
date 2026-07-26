@@ -27,7 +27,6 @@ interface QueueColumnProps extends DashboardQueue {
 
 export function QueueColumn({ className, count, orders, status }: QueueColumnProps) {
   const config = queueConfig[status]
-  const Icon = config.icon
 
   return (
     <Card className={cn('overflow-hidden', className)}>
@@ -38,8 +37,7 @@ export function QueueColumn({ className, count, orders, status }: QueueColumnPro
             <CardTitle className="truncate text-sm">{formatEnumLabel(status)}</CardTitle>
           </div>
           <div className="flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs font-semibold">
-            <Icon aria-hidden="true" className="size-3.5" />
-            {count}
+            {count} Total
           </div>
         </div>
       </CardHeader>

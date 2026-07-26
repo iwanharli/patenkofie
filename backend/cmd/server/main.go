@@ -23,9 +23,14 @@ import (
 	"paten-kopi/backend/internal/order"
 	"paten-kopi/backend/internal/payment"
 	"paten-kopi/backend/internal/pickup"
+	"paten-kopi/backend/internal/notification"
 	"paten-kopi/backend/internal/platform/config"
 	"paten-kopi/backend/internal/platform/logger"
+	reportpkg "paten-kopi/backend/internal/report"
 	services "paten-kopi/backend/internal/service"
+	auditpkg "paten-kopi/backend/internal/audit"
+	settingpkg "paten-kopi/backend/internal/setting"
+	userpkg "paten-kopi/backend/internal/user"
 )
 
 func main() {
@@ -39,13 +44,18 @@ func main() {
 	defer db.Close()
 
 	sessionStore := auth.NewSessionStore(8 * time.Hour)
+	auditHandler := auditpkg.NewHandler(auditpkg.NewRepository(db), sessionStore)
+	settingHandler := settingpkg.NewHandler(settingpkg.NewRepository(db), sessionStore, cfg.UploadDir, maxUploadBytes(cfg.MaxUploadMB))
 	authHandler := auth.NewHandler(auth.NewRepository(db), sessionStore)
 	customerHandler := customer.NewHandler(customer.NewRepository(db), sessionStore)
 	dashboardHandler := dashboard.NewHandler(dashboard.NewRepository(db), sessionStore)
 	orderHandler := order.NewHandler(order.NewRepository(db), sessionStore)
 	paymentHandler := payment.NewHandler(payment.NewRepository(db), sessionStore)
 	pickupHandler := pickup.NewHandler(pickup.NewRepository(db), sessionStore, cfg.UploadDir, maxUploadBytes(cfg.MaxUploadMB))
+	reportHandler := reportpkg.NewHandler(reportpkg.NewRepository(db), sessionStore)
 	serviceHandler := services.NewHandler(services.NewRepository(db))
+	userHandler := userpkg.NewHandler(userpkg.NewRepository(db), sessionStore, cfg.UploadDir, maxUploadBytes(cfg.MaxUploadMB))
+	notificationHandler := notification.NewHandler(notification.NewRepository(db), sessionStore)
 
 	router := chi.NewRouter()
 	router.Use(chimiddleware.RequestID)
@@ -79,14 +89,40 @@ func main() {
 		r.Get("/me", authHandler.Me)
 	})
 
+	router.Get("/api/v1/users", userHandler.List)
+	router.Post("/api/v1/users", userHandler.Create)
+	router.Get("/api/v1/users/{username}", userHandler.Detail)
+	router.Patch("/api/v1/users/{username}", userHandler.Update)
+	router.Post("/api/v1/users/{username}/reset-password", userHandler.ResetPassword)
+	router.Post("/api/v1/users/{username}/avatar", userHandler.UploadAvatar)
+	router.Patch("/api/v1/users/{username}/notification-settings", userHandler.UpdatePreferences)
+
+	router.Get("/api/v1/notifications", notificationHandler.List)
+	router.Patch("/api/v1/notifications/read", notificationHandler.MarkAllAsRead)
+
+	router.Get("/api/v1/reports/overview", reportHandler.Overview)
+	router.Get("/api/v1/reports/detail", reportHandler.Detail)
+	router.Get("/api/v1/reports/export", reportHandler.ExportCSV)
+	router.Get("/api/v1/audit-logs", auditHandler.List)
+	router.Get("/api/v1/audit-logs/{id}", auditHandler.Detail)
+
+	router.Get("/api/v1/settings/profile", settingHandler.GetProfile)
+	router.Patch("/api/v1/settings/profile", settingHandler.UpdateProfile)
+	router.Post("/api/v1/settings/profile/logo", settingHandler.UploadLogo)
+	router.Get("/api/v1/settings/backup", settingHandler.DownloadBackup)
+
 	router.Get("/api/v1/services", serviceHandler.List)
 	router.Get("/api/v1/dashboard", dashboardHandler.Overview)
 	router.Get("/api/v1/services/{code}", serviceHandler.Detail)
 	router.Get("/api/v1/customers/suggestions", customerHandler.Suggestions)
+	router.Get("/api/v1/customers/{id}", customerHandler.Detail)
+	router.Patch("/api/v1/customers/{id}", customerHandler.Update)
+	router.Get("/api/v1/customers", customerHandler.List)
 	router.Get("/api/v1/orders", orderHandler.List)
 	router.Post("/api/v1/orders", orderHandler.Create)
 	router.Patch("/api/v1/orders/bulk-status", orderHandler.BulkUpdateStatus)
 	router.Get("/api/v1/orders/{code}", orderHandler.Detail)
+	router.Patch("/api/v1/orders/{code}", orderHandler.Update)
 	router.Post("/api/v1/orders/{code}/payments/settle", paymentHandler.SettleOrder)
 	router.Patch("/api/v1/orders/{code}/status", orderHandler.UpdateStatus)
 	router.Delete("/api/v1/orders/{code}", orderHandler.Delete)
@@ -94,6 +130,8 @@ func main() {
 	router.Post("/api/v1/orders/{code}/pickup", pickupHandler.Create)
 	router.Get("/api/v1/payments", paymentHandler.List)
 	router.Get("/api/v1/payments/{code}", paymentHandler.Detail)
+	router.Patch("/api/v1/payments/{code}", paymentHandler.Update)
+	router.Delete("/api/v1/payments/{code}", paymentHandler.Delete)
 	router.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir(cfg.UploadDir))))
 
 	server := &http.Server{

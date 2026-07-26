@@ -1,15 +1,24 @@
 import {
   Banknote,
+  ChevronDown,
   Coffee,
   PanelLeftClose,
   PanelLeftOpen,
 } from 'lucide-react'
+import { useState } from 'react'
 import { Link, useLocation } from 'react-router'
 
+import { navigationItems } from '@/components/layout/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { navigationItems } from '@/components/layout/navigation'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useAuth } from '@/features/auth/useAuth'
 import { cn } from '@/lib/utils'
 
 interface SidebarProps {
@@ -19,9 +28,14 @@ interface SidebarProps {
 
 export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
   const location = useLocation()
+  const { user } = useAuth()
+  const [isSettingsOpen, setIsSettingsOpen] = useState(
+    location.pathname.startsWith('/settings'),
+  )
+
   const ToggleIcon = isCollapsed ? PanelLeftOpen : PanelLeftClose
-  const isActive = (href: string) =>
-    href === '/' ? location.pathname === '/' : location.pathname.startsWith(href)
+  const isActive = (href?: string) =>
+    href ? (href === '/' ? location.pathname === '/' : location.pathname.startsWith(href)) : false
 
   return (
     <aside
@@ -58,29 +72,130 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
         </Tooltip>
       </div>
 
-      <nav className={cn('flex flex-1 flex-col gap-1 py-4', isCollapsed ? 'px-3' : 'px-3')}>
+      <nav className={cn('flex flex-1 flex-col gap-1 overflow-y-auto py-4', isCollapsed ? 'px-3' : 'px-3')}>
         {navigationItems.map((item) => {
           const Icon = item.icon
+          const showDivider = item.showDividerAbove
+
+          if (item.children) {
+            const filteredChildren = item.children.filter(
+              (child) => !child.ownerOnly || user?.role === 'OWNER',
+            )
+            if (filteredChildren.length === 0) return null
+
+            const isGroupActive = location.pathname.startsWith('/settings')
+
+            if (isCollapsed) {
+              return (
+                <div key={item.label} className="w-full">
+                  {showDivider && <div className="my-1.5 border-t border-border/60" />}
+                  <DropdownMenu>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            aria-label={item.label}
+                            className={cn(
+                              'flex h-10 w-full items-center justify-center rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground',
+                              isGroupActive &&
+                                'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground',
+                            )}
+                            type="button"
+                          >
+                            <Icon aria-hidden="true" className="size-4 shrink-0" />
+                          </button>
+                        </DropdownMenuTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">{item.label}</TooltipContent>
+                    </Tooltip>
+                    <DropdownMenuContent side="right" sideOffset={8}>
+                      {filteredChildren.map((child) => (
+                        <DropdownMenuItem asChild key={child.href}>
+                          <Link
+                            className={cn(
+                              'w-full cursor-pointer text-xs font-medium',
+                              location.pathname === child.href && 'font-bold text-primary',
+                            )}
+                            to={child.href}
+                          >
+                            {child.label}
+                          </Link>
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )
+            }
+
+            return (
+              <div className="space-y-1" key={item.label}>
+                {showDivider && <div className="my-1.5 border-t border-border/60" />}
+                <button
+                  className={cn(
+                    'flex h-10 w-full items-center justify-between rounded-md px-3 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground',
+                    isGroupActive && 'bg-primary/10 font-semibold text-primary',
+                  )}
+                  onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                  type="button"
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon aria-hidden="true" className="size-4 shrink-0" />
+                    <span>{item.label}</span>
+                  </div>
+                  <ChevronDown
+                    aria-hidden="true"
+                    className={cn('size-4 transition-transform duration-200', isSettingsOpen && 'rotate-180')}
+                  />
+                </button>
+
+                {isSettingsOpen && (
+                  <div className="ml-4 flex flex-col gap-1 border-l border-border/80 py-1 pl-3">
+                    {filteredChildren.map((child) => {
+                      const isChildActive = location.pathname === child.href
+                      return (
+                        <Link
+                          className={cn(
+                            'flex h-8 items-center rounded-md px-2.5 text-xs font-medium transition-colors',
+                            isChildActive
+                              ? 'bg-primary font-semibold text-primary-foreground'
+                              : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                          )}
+                          key={child.href}
+                          to={child.href}
+                        >
+                          {child.label}
+                        </Link>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          }
 
           return (
-            <Tooltip key={item.label}>
-              <TooltipTrigger asChild>
-                <Link
-                  aria-label={item.label}
-                  className={cn(
-                    'flex h-10 w-full items-center rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground',
-                    isCollapsed ? 'justify-center px-0' : 'gap-3 px-3 text-left',
-                    isActive(item.href) &&
-                      'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground',
-                  )}
-                  to={item.href}
-                >
-                  <Icon aria-hidden="true" className="size-4 shrink-0" />
-                  <span className={cn(isCollapsed && 'sr-only')}>{item.label}</span>
-                </Link>
-              </TooltipTrigger>
-              {isCollapsed && <TooltipContent side="right">{item.label}</TooltipContent>}
-            </Tooltip>
+            <div key={item.label} className="w-full">
+              {showDivider && <div className="my-1.5 border-t border-border/60" />}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link
+                    aria-label={item.label}
+                    className={cn(
+                      'flex h-10 w-full items-center rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground',
+                      isCollapsed ? 'justify-center px-0' : 'gap-3 px-3 text-left',
+                      isActive(item.href) &&
+                        'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground',
+                    )}
+                    to={item.href ?? '/'}
+                  >
+                    <Icon aria-hidden="true" className="size-4 shrink-0" />
+                    <span className={cn(isCollapsed && 'sr-only')}>{item.label}</span>
+                  </Link>
+                </TooltipTrigger>
+                {isCollapsed && <TooltipContent side="right">{item.label}</TooltipContent>}
+              </Tooltip>
+            </div>
           )
         })}
       </nav>
@@ -96,14 +211,14 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
             <TooltipContent side="right">Kas hari ini Rp1.820.000</TooltipContent>
           </Tooltip>
         ) : (
-        <div className="rounded-lg border border-border bg-background p-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium">Kas hari ini</p>
-            <Badge variant="success">Tunai</Badge>
+          <div className="rounded-lg border border-border bg-background p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">Kas hari ini</p>
+              <Badge variant="success">Tunai</Badge>
+            </div>
+            <p className="mt-3 text-2xl font-semibold">Rp1.820.000</p>
+            <p className="mt-1 text-xs text-muted-foreground">8 pembayaran tercatat</p>
           </div>
-          <p className="mt-3 text-2xl font-semibold">Rp1.820.000</p>
-          <p className="mt-1 text-xs text-muted-foreground">8 pembayaran tercatat</p>
-        </div>
         )}
       </div>
     </aside>

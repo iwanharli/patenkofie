@@ -3,6 +3,8 @@ export interface AuthUser {
   name: string
   role: string
   username: string
+  avatar_url?: string
+  notification_preferences?: Record<string, boolean>
 }
 
 interface AuthResponse {

@@ -6,12 +6,15 @@ import { Link, useParams } from 'react-router'
 
 import { Button } from '@/components/ui/button'
 import { fetchOrder, type OrderRecord } from '@/features/orders/ordersApi'
-import { formatEnumLabel, formatRupiah } from '@/utils/format'
+import { fetchBusinessProfile } from '@/features/settings/settingsApi'
+import { formatEnumLabel, formatRupiah, formatWeight } from '@/utils/format'
 
 export function OrderLabelPrintPage() {
   const params = useParams()
   const [order, setOrder] = useState<OrderRecord | null>(null)
   const [qrDataUrl, setQrDataUrl] = useState('')
+  const [businessName, setBusinessName] = useState('PatenAndum')
+  const [receiptFooter, setReceiptFooter] = useState('Scan QR untuk membuka detail transaksi dan proses serah terima.')
   const [isLoading, setIsLoading] = useState(Boolean(params.orderCode))
   const [errorMessage, setErrorMessage] = useState('')
   const detailUrl = useMemo(() => {
@@ -21,6 +24,13 @@ export function OrderLabelPrintPage() {
 
     return `${window.location.origin}/orders/${order.order_code}`
   }, [order])
+
+  useEffect(() => {
+    fetchBusinessProfile().then((profile) => {
+      if (profile.business_name) setBusinessName(profile.business_name)
+      if (profile.receipt_footer) setReceiptFooter(profile.receipt_footer)
+    }).catch(() => {})
+  }, [])
 
   useEffect(() => {
     let isMounted = true
@@ -98,7 +108,7 @@ export function OrderLabelPrintPage() {
       <section className="order-label-paper mx-auto w-full max-w-[420px] rounded-md border border-border bg-white p-5 text-foreground shadow-sm print:shadow-none">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase text-primary">PatenAndum</p>
+            <p className="text-xs font-semibold uppercase text-primary">{businessName}</p>
             <h1 className="mt-1 text-xl font-bold leading-tight">{order.order_code}</h1>
             <p className="mt-1 text-sm text-muted-foreground">{formatDate(order.created_at)}</p>
           </div>
@@ -115,8 +125,8 @@ export function OrderLabelPrintPage() {
           <LabelInfo label="Pelanggan" value={order.customer_name} />
           <LabelInfo label="Telepon" value={order.customer_phone ?? '-'} />
           <LabelInfo label="Layanan" value={`${order.service_code} - ${order.service_name}`} />
-          <LabelInfo label="Berat" value={`${formatWeight(order.weight_kg)} kg`} />
-          <LabelInfo label="Produksi" value={formatEnumLabel(order.order_status)} />
+          <LabelInfo label="Berat" value={formatWeight(order.weight_kg)} />
+          <LabelInfo label="Kasir/Penerima" value={order.created_by_name ?? 'Sistem'} />
           <LabelInfo label="Bayar" value={formatEnumLabel(order.payment_status)} />
         </div>
 
@@ -126,7 +136,7 @@ export function OrderLabelPrintPage() {
             <p className="text-lg font-bold">{formatRupiah(order.total_amount)}</p>
           </div>
           <p className="max-w-44 text-right text-[11px] leading-snug text-muted-foreground">
-            Scan QR untuk membuka detail transaksi dan proses serah terima.
+            {receiptFooter}
           </p>
         </div>
       </section>
@@ -170,9 +180,4 @@ function formatDate(value: string) {
   }).format(new Date(value))
 }
 
-function formatWeight(value: string) {
-  return new Intl.NumberFormat('id-ID', {
-    maximumFractionDigits: 3,
-    minimumFractionDigits: 0,
-  }).format(Number(value))
-}
+

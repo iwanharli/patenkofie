@@ -71,6 +71,14 @@ echo "Starting backend on http://127.0.0.1:${BACKEND_PORT}"
 ) &
 PIDS+=("$!")
 
+# Wait for backend to be ready
+for i in {1..30}; do
+  if is_port_in_use "${BACKEND_PORT}"; then
+    break
+  fi
+  sleep 0.1
+done
+
 echo "Starting frontend on http://${FRONTEND_HOST}:${FRONTEND_PORT}"
 (
   cd "${FRONTEND_DIR}"

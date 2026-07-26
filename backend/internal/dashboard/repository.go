@@ -102,6 +102,8 @@ func (repo *Repository) summary(ctx context.Context, startDate time.Time, endDat
 			FROM orders
 			WHERE order_status NOT IN ('SELESAI', 'DIBATALKAN')
 				AND total_amount > paid_amount
+				AND created_at >= $1
+				AND created_at < $2
 		)
 		SELECT
 			(SELECT count(*) FROM period_orders),
@@ -210,14 +212,14 @@ func (repo *Repository) recentOrders(ctx context.Context, startDate time.Time, e
 		WHERE o.created_at >= $1
 			AND o.created_at < $2
 		ORDER BY o.created_at DESC, o.id DESC
-		LIMIT 14
+		LIMIT 15
 	`, startDate, endDate)
 	if err != nil {
 		return nil, fmt.Errorf("dashboard recent orders: %w", err)
 	}
 	defer rows.Close()
 
-	items := make([]RecentOrder, 0, 14)
+	items := make([]RecentOrder, 0, 15)
 	for rows.Next() {
 		var item RecentOrder
 		if err := rows.Scan(

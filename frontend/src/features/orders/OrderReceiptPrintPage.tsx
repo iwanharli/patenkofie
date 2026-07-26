@@ -1,0 +1,181 @@
+import { ArrowLeft, Printer } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { useEffect, useState } from 'react'
+import { Link, useParams } from 'react-router'
+
+import { Button } from '@/components/ui/button'
+import { fetchOrder, type OrderRecord } from '@/features/orders/ordersApi'
+import { fetchBusinessProfile } from '@/features/settings/settingsApi'
+import { formatEnumLabel, formatRupiah, formatWeight } from '@/utils/format'
+
+export function OrderReceiptPrintPage() {
+  const params = useParams()
+  const [order, setOrder] = useState<OrderRecord | null>(null)
+  const [businessName, setBusinessName] = useState('PatenAndum')
+  const [businessAddress, setBusinessAddress] = useState('')
+  const [receiptFooter, setReceiptFooter] = useState('Terima kasih atas kunjungan Anda!')
+  const [isLoading, setIsLoading] = useState(Boolean(params.orderCode))
+  const [errorMessage, setErrorMessage] = useState('')
+
+  useEffect(() => {
+    fetchBusinessProfile().then((profile) => {
+      if (profile.business_name) setBusinessName(profile.business_name)
+      if (profile.business_address) setBusinessAddress(profile.business_address)
+      if (profile.receipt_footer) setReceiptFooter(profile.receipt_footer)
+    }).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    let isMounted = true
+
+    if (!params.orderCode) {
+      setIsLoading(false)
+      setErrorMessage('Kode transaksi tidak tersedia.')
+      return
+    }
+
+    fetchOrder(params.orderCode)
+      .then((item) => {
+        if (isMounted) {
+          setOrder(item)
+          setErrorMessage('')
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setOrder(null)
+          setErrorMessage('Transaksi tidak ditemukan.')
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoading(false)
+        }
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [params.orderCode])
+
+  if (isLoading) {
+    return <PrintShell>Memuat struk...</PrintShell>
+  }
+
+  if (!order) {
+    return (
+      <PrintShell>
+        <div className="rounded-md border border-destructive/25 bg-destructive/10 p-4 text-sm text-destructive">
+          {errorMessage}
+        </div>
+      </PrintShell>
+    )
+  }
+
+  return (
+    <PrintShell orderCode={order.order_code}>
+      <section
+        className="mx-auto bg-white font-mono text-black print:m-0 print:bg-transparent"
+        style={{ width: '58mm' }}
+      >
+        {/* Header Struk */}
+        <div className="mb-4 text-center">
+          <h1 className="text-sm font-bold uppercase leading-tight">{businessName}</h1>
+          {businessAddress && (
+            <p className="mt-1 whitespace-pre-wrap text-[10px] leading-tight">{businessAddress}</p>
+          )}
+        </div>
+
+        {/* Info Transaksi */}
+        <div className="mb-4 border-b border-dashed border-black pb-3 text-[10px] leading-tight">
+          <div className="flex justify-between">
+            <span>No:</span>
+            <span>{order.order_code}</span>
+          </div>
+          <div className="flex justify-between mt-0.5">
+            <span>Tgl:</span>
+            <span>{formatDate(order.created_at)}</span>
+          </div>
+          <div className="flex justify-between mt-0.5">
+            <span>Kasir:</span>
+            <span>{order.created_by_name ?? 'Sistem'}</span>
+          </div>
+          <div className="flex justify-between mt-0.5">
+            <span>Plg:</span>
+            <span>{order.customer_name}</span>
+          </div>
+        </div>
+
+        {/* Rincian Pesanan */}
+        <div className="mb-4 text-[10px] leading-tight">
+          <p className="font-bold">{order.service_name}</p>
+          <div className="flex justify-between mt-1">
+            <span>{formatWeight(order.weight_kg)} x {formatRupiah(order.price_per_kg)}</span>
+            <span>{formatRupiah(order.total_amount)}</span>
+          </div>
+        </div>
+
+        {/* Rincian Pembayaran */}
+        <div className="mb-4 border-t border-dashed border-black pt-3 text-[10px] leading-tight">
+          <div className="flex justify-between font-bold">
+            <span>TOTAL:</span>
+            <span>{formatRupiah(order.total_amount)}</span>
+          </div>
+          <div className="flex justify-between mt-0.5">
+            <span>Status:</span>
+            <span className="uppercase">{formatEnumLabel(order.payment_status)}</span>
+          </div>
+          <div className="flex justify-between mt-0.5">
+            <span>Telah Dibayar:</span>
+            <span>{formatRupiah(order.paid_amount)}</span>
+          </div>
+          {order.total_amount > order.paid_amount && (
+            <div className="flex justify-between mt-0.5 font-bold">
+              <span>SISA TAGIHAN:</span>
+              <span>{formatRupiah(order.total_amount - order.paid_amount)}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Status Pesanan */}
+        <div className="mb-4 border-t border-dashed border-black pt-3 text-center text-[10px] leading-tight">
+          <p>Status: <span className="font-bold uppercase">{formatEnumLabel(order.order_status)}</span></p>
+        </div>
+
+        {/* Footer Struk */}
+        <div className="text-center text-[9px] leading-tight mt-6">
+          <p className="whitespace-pre-wrap">{receiptFooter}</p>
+        </div>
+      </section>
+    </PrintShell>
+  )
+}
+
+function PrintShell({ children, orderCode }: { children: ReactNode; orderCode?: string }) {
+  return (
+    <main className="min-h-svh bg-background p-5 print:bg-white print:p-0 flex flex-col items-center">
+      <div className="mx-auto mb-4 flex w-full max-w-[420px] items-center justify-between gap-3 print:hidden">
+        <Button asChild variant="outline">
+          <Link to={orderCode ? `/orders/${orderCode}` : '/orders'}>
+            <ArrowLeft aria-hidden="true" className="size-4" />
+            Kembali
+          </Link>
+        </Button>
+        <Button onClick={() => window.print()} type="button">
+          <Printer aria-hidden="true" className="size-4" />
+          Cetak
+        </Button>
+      </div>
+      <div className="bg-muted p-4 shadow-sm border print:border-none print:shadow-none print:p-0 print:bg-transparent inline-block">
+        {children}
+      </div>
+    </main>
+  )
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat('id-ID', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(new Date(value))
+}
