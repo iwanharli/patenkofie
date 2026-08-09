@@ -9,6 +9,10 @@ Semua perubahan penting pada proyek ini dicatat di file ini.
 - Panduan pairing/instalasi printer thermal 58mm langsung di halaman cetak struk.
 - Guard `RequireOwner` di level route frontend untuk semua halaman owner-only (Harga Layanan, Profil Toko, Pengguna, Audit Log) — sebelumnya status owner-only hanya disembunyikan di sidebar, bukan diblokir di route.
 
+### Changed
+- Autentikasi dan pengecekan role dipusatkan di middleware (`auth.RequireAuth` / `auth.RequireOwner`). Peta otorisasi seluruh aplikasi kini terbaca di satu tempat: pengelompokan route di `backend/cmd/server/main.go`. Handler tidak lagi membaca cookie sendiri maupun mengulang query `IsOwner`.
+- Menonaktifkan akun atau mengubah rolenya kini langsung berlaku pada sesi yang sedang berjalan, tidak menunggu sesi 8 jam berakhir.
+
 ### Fixed
 - Ukuran kertas cetak struk thermal (`@page`) yang sebelumnya global 90mm x 60mm (dibuat untuk label) kini spesifik per halaman: label tetap 90mm x 60mm, struk 58mm dengan tinggi otomatis.
 - `PATCH /api/v1/services/{code}` (ubah harga layanan) kini mewajibkan role OWNER — sebelumnya bisa diakses STAFF mana pun yang login.
