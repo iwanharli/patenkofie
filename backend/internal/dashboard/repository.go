@@ -104,6 +104,12 @@ func (repo *Repository) summary(ctx context.Context, startDate time.Time, endDat
 				AND total_amount > paid_amount
 				AND created_at >= $1
 				AND created_at < $2
+		),
+		period_expenses AS (
+			SELECT amount
+			FROM expenses
+			WHERE expense_date >= $1::date
+				AND expense_date < $2::date
 		)
 		SELECT
 			(SELECT count(*) FROM period_orders),
@@ -112,7 +118,8 @@ func (repo *Repository) summary(ctx context.Context, startDate time.Time, endDat
 			(SELECT COALESCE(sum(amount), 0) FROM period_payments),
 			(SELECT count(*) FROM period_payments),
 			(SELECT COALESCE(sum(remaining), 0) FROM active_outstanding),
-			(SELECT count(*) FROM active_outstanding)
+			(SELECT count(*) FROM active_outstanding),
+			(SELECT COALESCE(sum(amount), 0) FROM period_expenses)
 	`, startDate, endDate, previousStartDate).Scan(
 		&item.TransactionsToday,
 		&item.TransactionsPrevious,
@@ -121,6 +128,7 @@ func (repo *Repository) summary(ctx context.Context, startDate time.Time, endDat
 		&item.CashPaymentsToday,
 		&item.OutstandingAmountActive,
 		&item.OutstandingOrdersActive,
+		&item.ExpensesToday,
 	); err != nil {
 		return Summary{}, fmt.Errorf("dashboard summary: %w", err)
 	}

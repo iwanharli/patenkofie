@@ -10,6 +10,7 @@ type Summary struct {
 	CashPaymentsToday       int64
 	OutstandingAmountActive int64
 	OutstandingOrdersActive int64
+	ExpensesToday           int64
 }
 
 type QueueOrder struct {

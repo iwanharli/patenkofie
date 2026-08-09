@@ -79,11 +79,22 @@ export function DashboardPage() {
         value: <WeightText value={dashboard.summary.coffee_weight_today_kg} />,
       },
       {
-        detail: `${dashboard.summary.cash_payments_today} pembayaran tercatat`,
+        detail: (
+          <div className="flex flex-col gap-1 mt-2 text-[11px] font-medium leading-none text-muted-foreground">
+            <div className="flex justify-between">
+              <span>Masuk ({dashboard.summary.cash_payments_today})</span>
+              <span className="text-foreground">{formatRupiah(dashboard.summary.cash_amount_today)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Keluar</span>
+              <span className="text-foreground">-{formatRupiah(dashboard.summary.expenses_today || 0)}</span>
+            </div>
+          </div>
+        ),
         icon: Banknote,
-        label: 'Kas tunai',
+        label: 'Kas bersih (Laci)',
         tone: 'amber',
-        value: formatRupiah(dashboard.summary.cash_amount_today),
+        value: formatRupiah(dashboard.summary.cash_amount_today - (dashboard.summary.expenses_today || 0)),
       },
       {
         detail: `${dashboard.summary.outstanding_orders_active} order aktif`,
@@ -97,10 +108,6 @@ export function DashboardPage() {
 
   return (
     <div className="relative isolate flex flex-col gap-6 pb-8">
-      {/* Subtle modern glow effect for the dashboard */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 flex justify-center overflow-hidden">
-        <div className="h-[400px] w-full max-w-[800px] -translate-y-1/2 rounded-full bg-primary/10 blur-[100px]" />
-      </div>
 
       <PageHeader
         actions={

@@ -5,6 +5,7 @@ import {
   PackageCheck,
   Settings,
   Users,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -26,6 +27,7 @@ export const navigationItems: NavigationItem[] = [
   { href: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/orders', icon: PackageCheck, label: 'Transaksi', showDividerAbove: true },
   { href: '/payments', icon: CreditCard, label: 'Pembayaran', showDividerAbove: true },
+  { href: '/expenses', icon: Wallet, label: 'Kas Kecil' },
   { href: '/customers', icon: Users, label: 'Pelanggan' },
   { href: '/reports', icon: BarChart3, label: 'Laporan', showDividerAbove: true },
   {

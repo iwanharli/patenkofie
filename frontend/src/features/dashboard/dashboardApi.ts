@@ -24,6 +24,7 @@ export interface DashboardOverview {
     outstanding_orders_active: number
     transactions_today: number
     transactions_previous: number
+    expenses_today: number
   }
 }
 
