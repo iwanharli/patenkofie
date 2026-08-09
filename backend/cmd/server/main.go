@@ -16,6 +16,7 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/rs/zerolog/log"
 
+	auditpkg "paten-kopi/backend/internal/audit"
 	"paten-kopi/backend/internal/auth"
 	"paten-kopi/backend/internal/customer"
 	"paten-kopi/backend/internal/dashboard"
@@ -28,7 +29,6 @@ import (
 	"paten-kopi/backend/internal/platform/config"
 	"paten-kopi/backend/internal/platform/logger"
 	reportpkg "paten-kopi/backend/internal/report"
-	auditpkg "paten-kopi/backend/internal/audit"
 	services "paten-kopi/backend/internal/service"
 	settingpkg "paten-kopi/backend/internal/setting"
 	userpkg "paten-kopi/backend/internal/user"
@@ -46,19 +46,19 @@ func main() {
 
 	sessionStore := auth.NewSessionStore(8 * time.Hour)
 	authRepo := auth.NewRepository(db)
-	auditHandler := auditpkg.NewHandler(auditpkg.NewRepository(db), sessionStore)
-	settingHandler := settingpkg.NewHandler(settingpkg.NewRepository(db), sessionStore, cfg.UploadDir, maxUploadBytes(cfg.MaxUploadMB))
+	auditHandler := auditpkg.NewHandler(auditpkg.NewRepository(db))
+	settingHandler := settingpkg.NewHandler(settingpkg.NewRepository(db), cfg.UploadDir, maxUploadBytes(cfg.MaxUploadMB))
 	authHandler := auth.NewHandler(authRepo, sessionStore)
-	customerHandler := customer.NewHandler(customer.NewRepository(db), sessionStore)
-	expenseHandler := expense.NewHandler(expense.NewRepository(db), sessionStore)
-	dashboardHandler := dashboard.NewHandler(dashboard.NewRepository(db), sessionStore)
-	orderHandler := order.NewHandler(order.NewRepository(db), sessionStore)
-	paymentHandler := payment.NewHandler(payment.NewRepository(db), sessionStore)
-	pickupHandler := pickup.NewHandler(pickup.NewRepository(db), sessionStore, cfg.UploadDir, maxUploadBytes(cfg.MaxUploadMB))
-	reportHandler := reportpkg.NewHandler(reportpkg.NewRepository(db), sessionStore)
-	serviceHandler := services.NewHandler(services.NewRepository(db), sessionStore)
-	userHandler := userpkg.NewHandler(userpkg.NewRepository(db), sessionStore, cfg.UploadDir, maxUploadBytes(cfg.MaxUploadMB))
-	notificationHandler := notification.NewHandler(notification.NewRepository(db), sessionStore)
+	customerHandler := customer.NewHandler(customer.NewRepository(db))
+	expenseHandler := expense.NewHandler(expense.NewRepository(db))
+	dashboardHandler := dashboard.NewHandler(dashboard.NewRepository(db))
+	orderHandler := order.NewHandler(order.NewRepository(db))
+	paymentHandler := payment.NewHandler(payment.NewRepository(db))
+	pickupHandler := pickup.NewHandler(pickup.NewRepository(db), cfg.UploadDir, maxUploadBytes(cfg.MaxUploadMB))
+	reportHandler := reportpkg.NewHandler(reportpkg.NewRepository(db))
+	serviceHandler := services.NewHandler(services.NewRepository(db))
+	userHandler := userpkg.NewHandler(userpkg.NewRepository(db), cfg.UploadDir, maxUploadBytes(cfg.MaxUploadMB))
+	notificationHandler := notification.NewHandler(notification.NewRepository(db))
 
 	router := chi.NewRouter()
 	router.Use(chimiddleware.RequestID)

@@ -7,20 +7,12 @@ import (
 	"paten-kopi/backend/internal/auth"
 )
 
-type SessionStore interface {
-	Get(token string) (auth.Session, bool)
-}
-
 type Handler struct {
-	repo         *Repository
-	sessionStore SessionStore
+	repo *Repository
 }
 
-func NewHandler(repo *Repository, sessionStore SessionStore) *Handler {
-	return &Handler{
-		repo:         repo,
-		sessionStore: sessionStore,
-	}
+func NewHandler(repo *Repository) *Handler {
+	return &Handler{repo: repo}
 }
 
 func (handler *Handler) currentUserID(r *http.Request) (int64, bool) {

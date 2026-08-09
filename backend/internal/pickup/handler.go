@@ -34,11 +34,10 @@ const (
 type Handler struct {
 	maxUploadBytes int64
 	repo           *Repository
-	sessionStore   *auth.SessionStore
 	uploadDir      string
 }
 
-func NewHandler(repo *Repository, sessionStore *auth.SessionStore, uploadDir string, maxUploadBytes int64) *Handler {
+func NewHandler(repo *Repository, uploadDir string, maxUploadBytes int64) *Handler {
 	if maxUploadBytes <= 0 {
 		maxUploadBytes = 2 << 20
 	}
@@ -46,7 +45,6 @@ func NewHandler(repo *Repository, sessionStore *auth.SessionStore, uploadDir str
 	return &Handler{
 		maxUploadBytes: maxUploadBytes,
 		repo:           repo,
-		sessionStore:   sessionStore,
 		uploadDir:      uploadDir,
 	}
 }
