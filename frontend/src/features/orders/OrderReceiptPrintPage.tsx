@@ -14,7 +14,7 @@ export function OrderReceiptPrintPage() {
   const [searchParams] = useSearchParams()
   const isAutoPrint = searchParams.get('autoprint') === '1'
   const [order, setOrder] = useState<OrderRecord | null>(null)
-  const [businessName, setBusinessName] = useState('PatenAndum')
+  const [businessName, setBusinessName] = useState('Patenote')
   const [businessAddress, setBusinessAddress] = useState('')
   const [receiptFooter, setReceiptFooter] = useState('Terima kasih atas kunjungan Anda!')
   const [isLoading, setIsLoading] = useState(Boolean(params.orderCode))

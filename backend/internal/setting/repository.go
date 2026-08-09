@@ -30,7 +30,7 @@ func (repo *Repository) GetBusinessProfile(ctx context.Context) (BusinessProfile
 	defer rows.Close()
 
 	profile := BusinessProfile{
-		BusinessName:    "PatenAndum",
+		BusinessName:    "Patenote",
 		BusinessAddress: "Jl. Raya Kopi No. 123",
 		BusinessPhone:   "0812-3456-7890",
 		ReceiptFooter:   "Terima kasih atas kunjungan Anda. Harap simpan label QR ini.",
@@ -120,7 +120,7 @@ func (repo *Repository) ExportBackup(ctx context.Context) ([]byte, string, error
 	}
 
 	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintf("-- PatenAndum Database Backup Dump\n-- Generated At: %s\n-- Database: db_patenandum\n\n", time.Now().Format(time.RFC3339)))
+	buf.WriteString(fmt.Sprintf("-- Patenote Database Backup Dump\n-- Generated At: %s\n-- Database: db_patenandum\n\n", time.Now().Format(time.RFC3339)))
 	buf.WriteString("SET statement_timeout = 0;\nSET client_encoding = 'UTF8';\n\n")
 
 	for _, table := range tables {

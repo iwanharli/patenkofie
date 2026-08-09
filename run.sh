@@ -21,7 +21,7 @@ cleanup() {
 
   if [ "${#PIDS[@]}" -gt 0 ]; then
     echo
-    echo "Stopping PatenAndum dev servers..."
+    echo "Stopping Patenote dev servers..."
     kill "${PIDS[@]}" 2>/dev/null || true
     wait "${PIDS[@]}" 2>/dev/null || true
   fi
@@ -31,7 +31,7 @@ trap cleanup EXIT
 trap 'cleanup; exit 130' INT TERM
 
 if [ ! -d "${BACKEND_DIR}" ] || [ ! -d "${FRONTEND_DIR}" ]; then
-  echo "run.sh must be executed from the PatenAndum project root."
+  echo "run.sh must be executed from the Patenote project root."
   exit 1
 fi
 
@@ -87,7 +87,7 @@ echo "Starting frontend on http://${FRONTEND_HOST}:${FRONTEND_PORT}"
 PIDS+=("$!")
 
 echo
-echo "PatenAndum dev servers are running."
+echo "Patenote dev servers are running."
 echo "Frontend: http://${FRONTEND_HOST}:${FRONTEND_PORT}"
 echo "Backend:  http://127.0.0.1:${BACKEND_PORT}/healthz"
 echo "Press Ctrl+C to stop both."

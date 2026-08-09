@@ -13,7 +13,7 @@ export function OrderLabelPrintPage() {
   const params = useParams()
   const [order, setOrder] = useState<OrderRecord | null>(null)
   const [qrDataUrl, setQrDataUrl] = useState('')
-  const [businessName, setBusinessName] = useState('PatenAndum')
+  const [businessName, setBusinessName] = useState('Patenote')
   const [receiptFooter, setReceiptFooter] = useState('Scan QR untuk membuka detail transaksi dan proses serah terima.')
   const [isLoading, setIsLoading] = useState(Boolean(params.orderCode))
   const [errorMessage, setErrorMessage] = useState('')

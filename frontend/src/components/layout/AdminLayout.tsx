@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils'
 export function AdminLayout({ children }: PropsWithChildren) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
-  const [appName, setAppName] = useState('PatenAndum')
+  const [appName, setAppName] = useState('Patenote')
 
   useEffect(() => {
     fetchBusinessProfile()

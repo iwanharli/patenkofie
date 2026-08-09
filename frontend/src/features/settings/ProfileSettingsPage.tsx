@@ -209,7 +209,7 @@ export function ProfileSettingsPage() {
                       disabled={!isOwner}
                       id="business-name"
                       onChange={(e) => setBusinessName(e.target.value)}
-                      placeholder="Contoh: PatenAndum Coffee"
+                      placeholder="Contoh: Patenote Coffee"
                       value={businessName}
                     />
                   </div>
