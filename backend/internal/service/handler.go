@@ -62,6 +62,16 @@ func (handler *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	isOwner, err := handler.repo.IsOwner(r.Context(), session.UserID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "ROLE_CHECK_FAILED", "Role pengguna gagal diperiksa")
+		return
+	}
+	if !isOwner {
+		writeError(w, http.StatusForbidden, "OWNER_ONLY", "Hanya OWNER yang dapat mengubah harga layanan")
+		return
+	}
+
 	code := chi.URLParam(r, "code")
 	var req struct {
 		PricePerKg *int64 `json:"price_per_kg"`
