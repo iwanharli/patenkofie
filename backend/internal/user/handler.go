@@ -97,12 +97,6 @@ func (handler *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	currentUser, err := handler.repo.FindByID(r.Context(), currentUserID)
-	if err != nil || currentUser.Role != "OWNER" {
-		writeError(w, http.StatusForbidden, "FORBIDDEN", "Hanya OWNER yang dapat membuat pengguna baru")
-		return
-	}
-
 	var request struct {
 		Name     string `json:"name"`
 		Username string `json:"username"`
@@ -160,12 +154,6 @@ func (handler *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	currentUserID, ok := handler.currentUserID(r)
 	if !ok {
 		writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "Session tidak valid")
-		return
-	}
-
-	currentUser, err := handler.repo.FindByID(r.Context(), currentUserID)
-	if err != nil || currentUser.Role != "OWNER" {
-		writeError(w, http.StatusForbidden, "FORBIDDEN", "Hanya OWNER yang dapat mengubah data pengguna")
 		return
 	}
 
@@ -258,12 +246,6 @@ func (handler *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	currentUser, err := handler.repo.FindByID(r.Context(), currentUserID)
-	if err != nil || currentUser.Role != "OWNER" {
-		writeError(w, http.StatusForbidden, "FORBIDDEN", "Hanya OWNER yang dapat mereset password pengguna")
-		return
-	}
-
 	usernameParam := chi.URLParam(r, "username")
 
 	var request struct {
@@ -279,7 +261,7 @@ func (handler *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = handler.repo.ResetPassword(r.Context(), usernameParam, request.NewPassword)
+	err := handler.repo.ResetPassword(r.Context(), usernameParam, request.NewPassword)
 	if errors.Is(err, ErrUserNotFound) {
 		writeError(w, http.StatusNotFound, "USER_NOT_FOUND", "Pengguna tidak ditemukan")
 		return
@@ -296,17 +278,12 @@ func (handler *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 }
 
 func (handler *Handler) currentUserID(r *http.Request) (int64, bool) {
-	cookie, err := r.Cookie(auth.SessionCookieName)
-	if err != nil {
-		return 0, false
-	}
-
-	session, ok := handler.sessionStore.Get(cookie.Value)
+	actor, ok := auth.ActorFrom(r.Context())
 	if !ok {
 		return 0, false
 	}
 
-	return session.UserID, true
+	return actor.UserID, true
 }
 
 func parsePositiveInt(value string, fallback int) int {
@@ -319,20 +296,16 @@ func parsePositiveInt(value string, fallback int) int {
 }
 
 func (handler *Handler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
-	currentUserID, ok := handler.currentUserID(r)
+	actor, ok := auth.ActorFrom(r.Context())
 	if !ok {
 		writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "Session tidak valid")
 		return
 	}
 
+	// Not covered by RequireOwner: a staff member may still replace their own
+	// avatar, only somebody else's is owner-only.
 	targetUsername := chi.URLParam(r, "username")
-	currentUser, err := handler.repo.FindByID(r.Context(), currentUserID)
-	if err != nil {
-		writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "Pengguna tidak ditemukan")
-		return
-	}
-
-	if currentUser.Role != "OWNER" && !strings.EqualFold(currentUser.Username, targetUsername) {
+	if !actor.IsOwner() && !strings.EqualFold(actor.Username, targetUsername) {
 		writeError(w, http.StatusForbidden, "FORBIDDEN", "Anda tidak memiliki izin mengubah foto profil ini")
 		return
 	}

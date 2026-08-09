@@ -200,13 +200,8 @@ func (handler *Handler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (handler *Handler) isAuthenticated(r *http.Request) bool {
-	cookie, err := r.Cookie(auth.SessionCookieName)
-	if err != nil {
-		return false
-	}
-
-	session, ok := handler.sessionStore.Get(cookie.Value)
-	return ok && session.UserID != 0
+	actor, ok := auth.ActorFrom(r.Context())
+	return ok && actor.UserID != 0
 }
 
 func customerSuggestionResponse(item CustomerSuggestion) map[string]any {

@@ -24,17 +24,12 @@ func NewHandler(repo *Repository, sessionStore SessionStore) *Handler {
 }
 
 func (handler *Handler) currentUserID(r *http.Request) (int64, bool) {
-	cookie, err := r.Cookie(auth.SessionCookieName)
-	if err != nil {
-		return 0, false
-	}
-
-	session, ok := handler.sessionStore.Get(cookie.Value)
+	actor, ok := auth.ActorFrom(r.Context())
 	if !ok {
 		return 0, false
 	}
 
-	return session.UserID, true
+	return actor.UserID, true
 }
 
 func (handler *Handler) List(w http.ResponseWriter, r *http.Request) {

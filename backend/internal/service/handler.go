@@ -50,25 +50,9 @@ func (handler *Handler) Detail(w http.ResponseWriter, r *http.Request) {
 }
 
 func (handler *Handler) Update(w http.ResponseWriter, r *http.Request) {
-	cookie, err := r.Cookie(auth.SessionCookieName)
-	if err != nil {
+	actor, ok := auth.ActorFrom(r.Context())
+	if !ok || actor.UserID == 0 {
 		writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "Session tidak valid")
-		return
-	}
-
-	session, ok := handler.sessionStore.Get(cookie.Value)
-	if !ok || session.UserID == 0 {
-		writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "Session tidak valid")
-		return
-	}
-
-	isOwner, err := handler.repo.IsOwner(r.Context(), session.UserID)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "ROLE_CHECK_FAILED", "Role pengguna gagal diperiksa")
-		return
-	}
-	if !isOwner {
-		writeError(w, http.StatusForbidden, "OWNER_ONLY", "Hanya OWNER yang dapat mengubah harga layanan")
 		return
 	}
 
@@ -103,7 +87,7 @@ func (handler *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		isActive = *req.IsActive
 	}
 
-	if err := handler.repo.Update(r.Context(), code, pricePerKg, isActive, session.UserID); err != nil {
+	if err := handler.repo.Update(r.Context(), code, pricePerKg, isActive, actor.UserID); err != nil {
 		writeError(w, http.StatusInternalServerError, "SERVICE_UPDATE_FAILED", "Data layanan gagal diperbarui")
 		return
 	}

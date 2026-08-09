@@ -305,17 +305,6 @@ func (handler *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	isOwner, err := handler.repo.IsOwner(r.Context(), userID)
-	if err != nil {
-		log.Error().Err(err).Msg("delete order role check failed")
-		writeError(w, http.StatusInternalServerError, "ROLE_CHECK_FAILED", "Role pengguna gagal diperiksa")
-		return
-	}
-	if !isOwner {
-		writeError(w, http.StatusForbidden, "OWNER_ONLY", "Hanya owner yang dapat menghapus transaksi")
-		return
-	}
-
 	item, err := handler.repo.DeleteByCode(r.Context(), chi.URLParam(r, "code"), userID)
 	if errors.Is(err, ErrOrderNotFound) {
 		writeError(w, http.StatusNotFound, "ORDER_NOT_FOUND", "Transaksi tidak ditemukan")
@@ -331,17 +320,12 @@ func (handler *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (handler *Handler) currentUserID(r *http.Request) (int64, bool) {
-	cookie, err := r.Cookie(auth.SessionCookieName)
-	if err != nil {
-		return 0, false
-	}
-
-	session, ok := handler.sessionStore.Get(cookie.Value)
+	actor, ok := auth.ActorFrom(r.Context())
 	if !ok {
 		return 0, false
 	}
 
-	return session.UserID, true
+	return actor.UserID, true
 }
 
 func buildCreateInput(request struct {

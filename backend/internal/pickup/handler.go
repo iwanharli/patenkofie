@@ -192,17 +192,12 @@ func (handler *Handler) removeStoredPhoto(photoPath string) error {
 }
 
 func (handler *Handler) currentUserID(r *http.Request) (int64, bool) {
-	cookie, err := r.Cookie(auth.SessionCookieName)
-	if err != nil {
+	actor, ok := auth.ActorFrom(r.Context())
+	if !ok || actor.UserID == 0 {
 		return 0, false
 	}
 
-	session, ok := handler.sessionStore.Get(cookie.Value)
-	if !ok || session.UserID == 0 {
-		return 0, false
-	}
-
-	return session.UserID, true
+	return actor.UserID, true
 }
 
 func isAllowedImageContentType(contentType string) bool {
