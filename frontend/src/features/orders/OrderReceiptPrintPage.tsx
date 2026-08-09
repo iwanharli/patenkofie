@@ -154,6 +154,7 @@ export function OrderReceiptPrintPage() {
 function PrintShell({ children, orderCode }: { children: ReactNode; orderCode?: string }) {
   return (
     <main className="min-h-svh bg-background p-5 print:bg-white print:p-0 flex flex-col items-center">
+      <style>{'@media print { @page { size: 58mm auto; margin: 2mm; } }'}</style>
       <div className="mx-auto mb-4 flex w-full max-w-[420px] items-center justify-between gap-3 print:hidden">
         <Button asChild variant="outline">
           <Link to={orderCode ? `/orders/${orderCode}` : '/orders'}>
@@ -169,7 +170,39 @@ function PrintShell({ children, orderCode }: { children: ReactNode; orderCode?: 
       <div className="bg-muted p-4 shadow-sm border print:border-none print:shadow-none print:p-0 print:bg-transparent inline-block">
         {children}
       </div>
+      <PrinterSetupGuide />
     </main>
+  )
+}
+
+function PrinterSetupGuide() {
+  return (
+    <details className="mx-auto mt-4 w-full max-w-[420px] rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground print:hidden">
+      <summary className="cursor-pointer font-medium text-foreground">
+        Cara pasang printer thermal 58mm (mis. ZJ-5809)
+      </summary>
+      <div className="mt-2 space-y-3">
+        <div>
+          <p className="font-medium text-foreground">Windows (via USB atau Bluetooth)</p>
+          <ol className="mt-1 list-decimal space-y-1 pl-4">
+            <li>Unduh driver resmi dari situs Zjiang (zjiang.com &gt; Service &gt; Driver), pilih driver untuk model ZJ-5809.</li>
+            <li>Colok printer via kabel USB, atau nyalakan printer lalu pasangkan (pair) via Bluetooth di Settings &gt; Bluetooth &amp; devices &gt; Add device.</li>
+            <li>Install driver yang sudah diunduh, lalu buka Settings &gt; Printers &amp; scanners &gt; pastikan printer (mis. "ZJ-5809") muncul dan berstatus siap.</li>
+            <li>Jadikan sebagai printer default agar dialog cetak browser otomatis memilihnya (opsional).</li>
+          </ol>
+        </div>
+        <div>
+          <p className="font-medium text-foreground">Android / iOS</p>
+          <ol className="mt-1 list-decimal space-y-1 pl-4">
+            <li>Nyalakan printer dan pasangkan (pair) via Bluetooth di pengaturan HP.</li>
+            <li>Install app print service bawaan printer (jika tersedia) agar printer terdaftar sebagai printer sistem, lalu cetak dari menu Share/Print browser.</li>
+          </ol>
+        </div>
+        <p>
+          Setelah printer terpasang sebagai printer sistem, klik tombol "Cetak" di atas lalu pilih printer tersebut pada dialog cetak.
+        </p>
+      </div>
+    </details>
   )
 }
 
