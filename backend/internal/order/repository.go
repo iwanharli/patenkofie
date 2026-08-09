@@ -331,10 +331,12 @@ func (repo *Repository) FindByCode(ctx context.Context, code string) (Order, err
 		return Order{}, fmt.Errorf("find order by code: %w", err)
 	}
 
-	// Fetch status change history and officer logs
+	// Fetch status change history and officer logs.
+	// previous_status is NULL for the first entry of an order, so it has to be
+	// coalesced: scanning NULL into a string fails and drops the whole row.
 	logsRows, err := repo.db.Query(ctx, `
 		SELECT
-			osl.previous_status,
+			COALESCE(osl.previous_status, '') AS previous_status,
 			osl.new_status,
 			COALESCE(u.name, 'Sistem') AS changed_by_name,
 			osl.changed_at,
@@ -344,17 +346,23 @@ func (repo *Repository) FindByCode(ctx context.Context, code string) (Order, err
 		WHERE osl.order_id = $1
 		ORDER BY osl.changed_at ASC
 	`, item.ID)
-	if err == nil {
-		defer logsRows.Close()
-		logs := make([]OrderStatusLogItem, 0)
-		for logsRows.Next() {
-			var l OrderStatusLogItem
-			if scanErr := logsRows.Scan(&l.PreviousStatus, &l.NewStatus, &l.ChangedByName, &l.ChangedAt, &l.Notes); scanErr == nil {
-				logs = append(logs, l)
-			}
-		}
-		item.StatusLogs = logs
+	if err != nil {
+		return Order{}, fmt.Errorf("find order status logs: %w", err)
 	}
+	defer logsRows.Close()
+
+	logs := make([]OrderStatusLogItem, 0)
+	for logsRows.Next() {
+		var l OrderStatusLogItem
+		if scanErr := logsRows.Scan(&l.PreviousStatus, &l.NewStatus, &l.ChangedByName, &l.ChangedAt, &l.Notes); scanErr != nil {
+			return Order{}, fmt.Errorf("scan order status log: %w", scanErr)
+		}
+		logs = append(logs, l)
+	}
+	if err := logsRows.Err(); err != nil {
+		return Order{}, fmt.Errorf("iterate order status logs: %w", err)
+	}
+	item.StatusLogs = logs
 
 	return item, nil
 }

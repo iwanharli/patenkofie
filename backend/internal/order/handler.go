@@ -126,7 +126,7 @@ func (handler *Handler) Detail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"data": orderResponse(item)})
+	writeJSON(w, http.StatusOK, map[string]any{"data": orderDetailResponse(item)})
 }
 
 func (handler *Handler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
@@ -170,7 +170,7 @@ func (handler *Handler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"data": orderResponse(item)})
+	writeJSON(w, http.StatusOK, map[string]any{"data": orderDetailResponse(item)})
 }
 
 func (handler *Handler) BulkUpdateStatus(w http.ResponseWriter, r *http.Request) {
@@ -294,7 +294,7 @@ func (handler *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"data": orderResponse(item)})
+	writeJSON(w, http.StatusOK, map[string]any{"data": orderDetailResponse(item)})
 }
 
 func (handler *Handler) Delete(w http.ResponseWriter, r *http.Request) {
@@ -497,6 +497,30 @@ func orderResponse(item Order) map[string]any {
 		"created_at":     item.CreatedAt,
 		"updated_at":     item.UpdatedAt,
 	}
+}
+
+// orderDetailResponse adds the fields only the detail query (FindByCode) fills
+// in: who took the order, who handed it over, and the status history. The list
+// query does not join those, so list rows keep using orderResponse rather than
+// reporting empty names.
+func orderDetailResponse(item Order) map[string]any {
+	response := orderResponse(item)
+	response["created_by_name"] = item.CreatedByName
+	response["picked_up_by_name"] = item.PickedUpByName
+
+	logs := make([]map[string]any, 0, len(item.StatusLogs))
+	for _, entry := range item.StatusLogs {
+		logs = append(logs, map[string]any{
+			"previous_status": entry.PreviousStatus,
+			"new_status":      entry.NewStatus,
+			"changed_by_name": entry.ChangedByName,
+			"changed_at":      entry.ChangedAt,
+			"notes":           entry.Notes,
+		})
+	}
+	response["status_logs"] = logs
+
+	return response
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {
