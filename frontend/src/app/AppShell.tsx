@@ -4,6 +4,7 @@ import { AdminLayout } from '@/components/layout/AdminLayout'
 import { AuditDetailPage } from '@/features/audit/AuditDetailPage'
 import { AuditLogsSettingsPage } from '@/features/audit/AuditLogsSettingsPage'
 import { RequireAuth } from '@/features/auth/RequireAuth'
+import { RequireOwner } from '@/features/auth/RequireOwner'
 import { DashboardPage } from '@/features/dashboard/DashboardPage'
 import { ExpensesPage } from '@/features/expenses/ExpensesPage'
 import { CustomerDetailPage } from '@/features/customers/CustomerDetailPage'
@@ -68,13 +69,62 @@ export function AppShell() {
                 <Route element={<ReportDetailPage />} path="reports/:reportType" />
                 <Route element={<NotificationListPage />} path="notifications" />
                 <Route element={<Navigate replace to="/settings/services" />} path="settings" />
-                <Route element={<ServiceSettingsPage />} path="settings/services" />
-                <Route element={<ServiceDetailPage />} path="settings/services/:serviceCode" />
-                <Route element={<ProfileSettingsPage />} path="settings/profile" />
-                <Route element={<UserSettingsPage />} path="settings/users" />
-                <Route element={<UserDetailPage />} path="settings/users/:username" />
-                <Route element={<AuditLogsSettingsPage />} path="settings/audit" />
-                <Route element={<AuditDetailPage />} path="audit/:auditId" />
+                <Route
+                  element={
+                    <RequireOwner>
+                      <ServiceSettingsPage />
+                    </RequireOwner>
+                  }
+                  path="settings/services"
+                />
+                <Route
+                  element={
+                    <RequireOwner>
+                      <ServiceDetailPage />
+                    </RequireOwner>
+                  }
+                  path="settings/services/:serviceCode"
+                />
+                <Route
+                  element={
+                    <RequireOwner>
+                      <ProfileSettingsPage />
+                    </RequireOwner>
+                  }
+                  path="settings/profile"
+                />
+                <Route
+                  element={
+                    <RequireOwner>
+                      <UserSettingsPage />
+                    </RequireOwner>
+                  }
+                  path="settings/users"
+                />
+                <Route
+                  element={
+                    <RequireOwner>
+                      <UserDetailPage />
+                    </RequireOwner>
+                  }
+                  path="settings/users/:username"
+                />
+                <Route
+                  element={
+                    <RequireOwner>
+                      <AuditLogsSettingsPage />
+                    </RequireOwner>
+                  }
+                  path="settings/audit"
+                />
+                <Route
+                  element={
+                    <RequireOwner>
+                      <AuditDetailPage />
+                    </RequireOwner>
+                  }
+                  path="audit/:auditId"
+                />
                 <Route element={<Navigate replace to="/" />} path="*" />
               </Routes>
             </AdminLayout>
