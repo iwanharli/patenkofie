@@ -26,15 +26,13 @@ import (
 
 type Handler struct {
 	repo           *Repository
-	sessionStore   *auth.SessionStore
 	uploadDir      string
 	maxUploadBytes int64
 }
 
-func NewHandler(repo *Repository, sessionStore *auth.SessionStore, uploadDir string, maxUploadBytes int64) *Handler {
+func NewHandler(repo *Repository, uploadDir string, maxUploadBytes int64) *Handler {
 	return &Handler{
 		repo:           repo,
-		sessionStore:   sessionStore,
 		uploadDir:      uploadDir,
 		maxUploadBytes: maxUploadBytes,
 	}
