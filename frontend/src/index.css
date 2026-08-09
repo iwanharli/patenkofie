@@ -66,8 +66,7 @@ button:disabled {
 
 @media print {
   @page {
-    margin: 4mm;
-    size: 90mm 60mm;
+    margin: 2mm;
   }
 
   html,

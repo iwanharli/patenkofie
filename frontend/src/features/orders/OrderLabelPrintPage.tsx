@@ -147,6 +147,7 @@ export function OrderLabelPrintPage() {
 function PrintShell({ children, orderCode }: { children: ReactNode; orderCode?: string }) {
   return (
     <main className="min-h-svh bg-background p-5 print:bg-white print:p-0">
+      <style>{'@media print { @page { size: 90mm 60mm; margin: 4mm; } }'}</style>
       <div className="mx-auto mb-4 flex w-full max-w-[420px] items-center justify-between gap-3 print:hidden">
         <Button asChild variant="outline">
           <Link to={orderCode ? `/orders/${orderCode}` : '/orders'}>
