@@ -56,7 +56,7 @@ export function LoginPage() {
               <Coffee aria-hidden="true" className="size-5" />
             </div>
             <div>
-              <p className="text-lg font-bold tracking-wide">PatenAndum</p>
+              <p className="text-lg font-bold tracking-wide">Patenote</p>
               <p className="text-xs font-medium text-white/70">Admin Operasional</p>
             </div>
           </div>
@@ -80,7 +80,7 @@ export function LoginPage() {
               <div className="mx-auto mb-4 grid size-12 place-items-center rounded-md bg-primary text-primary-foreground lg:hidden">
                 <Coffee aria-hidden="true" className="size-6" />
               </div>
-              <CardTitle className="text-2xl">Masuk ke PatenAndum</CardTitle>
+              <CardTitle className="text-2xl">Masuk ke Patenote</CardTitle>
               <CardDescription className="text-base">Gunakan akun owner atau staf kasir.</CardDescription>
             </CardHeader>
             <CardContent>

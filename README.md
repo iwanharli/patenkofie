@@ -1,6 +1,6 @@
-# PatenAndum
+# Patenote
 
-PatenAndum adalah aplikasi operasional untuk layanan kopi masuk, penggilingan, roasting, pembayaran tunai, QR label, dan serah terima order dengan bukti foto.
+Patenote adalah aplikasi operasional untuk layanan kopi masuk, penggilingan, roasting, pembayaran tunai, QR label, dan serah terima order dengan bukti foto.
 
 ## Stack
 
@@ -252,7 +252,7 @@ Uploads:
 
 ## Status Aplikasi
 
-Seluruh fitur operasional kasir dan manajemen roasting kopi PatenAndum telah **100% selesai dibuat** dan siap digunakan. Catatan: Aplikasi berjalan langsung menggunakan binary Go backend dan React frontend build tanpa membutuhkan Docker.
+Seluruh fitur operasional kasir dan manajemen roasting kopi Patenote telah **100% selesai dibuat** dan siap digunakan. Catatan: Aplikasi berjalan langsung menggunakan binary Go backend dan React frontend build tanpa membutuhkan Docker.
 
 ## Catatan Fitur MVP & Roadmap (Phase 2)
 

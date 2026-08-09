@@ -178,7 +178,7 @@ ON CONFLICT (code) DO NOTHING;
 
 INSERT INTO app_settings (key, value, description)
 VALUES
-    ('business_name', 'PatenAndum', 'Nama usaha yang ditampilkan pada aplikasi'),
+    ('business_name', 'Patenote', 'Nama usaha yang ditampilkan pada aplikasi'),
     ('max_upload_mb', '2', 'Batas ukuran upload foto pengambilan dalam MB'),
     ('timezone', 'Asia/Jakarta', 'Zona waktu tampilan aplikasi')
 ON CONFLICT (key) DO NOTHING;

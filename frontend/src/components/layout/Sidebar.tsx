@@ -69,7 +69,7 @@ export function Sidebar({ isCollapsed, onToggle, appName }: SidebarProps) {
           <Coffee aria-hidden="true" className="size-5" />
         </div>
         <div className={cn('min-w-0 flex-1', isCollapsed && 'hidden')}>
-          <p className="text-base font-semibold leading-5">{appName || 'PatenAndum'}</p>
+          <p className="text-base font-semibold leading-5">{appName || 'Patenote'}</p>
           <p className="text-xs text-muted-foreground">Admin operasional</p>
         </div>
         <Tooltip>

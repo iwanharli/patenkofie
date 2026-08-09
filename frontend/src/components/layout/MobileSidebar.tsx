@@ -50,7 +50,7 @@ export function MobileSidebar({ isOpen, onClose, appName }: MobileSidebarProps) 
             <Coffee aria-hidden="true" className="size-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-base font-semibold leading-5">{appName || 'PatenAndum'}</p>
+            <p className="text-base font-semibold leading-5">{appName || 'Patenote'}</p>
             <p className="text-xs text-muted-foreground">Admin operasional</p>
           </div>
           <Button aria-label="Tutup menu" onClick={onClose} size="icon" variant="ghost">
