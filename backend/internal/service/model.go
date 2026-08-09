@@ -10,4 +10,7 @@ type Service struct {
 	IsActive      bool
 	UpdatedByName *string
 	UpdatedAt     time.Time
+	TodayOrders   int64
+	TodayWeight   float64
+	TodayRevenue  int64
 }

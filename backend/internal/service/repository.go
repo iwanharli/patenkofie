@@ -57,10 +57,16 @@ func (repo *Repository) List(ctx context.Context) ([]Service, error) {
 func (repo *Repository) FindByCode(ctx context.Context, code string) (Service, error) {
 	var item Service
 	err := repo.db.QueryRow(ctx, `
-		SELECT s.id, s.code, s.name, s.price_per_kg, s.is_active, u.name, s.updated_at
+		SELECT 
+			s.id, s.code, s.name, s.price_per_kg, s.is_active, u.name, s.updated_at,
+			COUNT(o.id) AS today_orders,
+			COALESCE(SUM(o.weight_kg), 0) AS today_weight,
+			COALESCE(SUM(o.total_amount), 0) AS today_revenue
 		FROM services s
 		LEFT JOIN users u ON u.id = s.updated_by
+		LEFT JOIN orders o ON o.service_id = s.id AND o.created_at::DATE = CURRENT_DATE
 		WHERE s.code = $1
+		GROUP BY s.id, u.id
 	`, code).Scan(
 		&item.ID,
 		&item.Code,
@@ -69,6 +75,9 @@ func (repo *Repository) FindByCode(ctx context.Context, code string) (Service, e
 		&item.IsActive,
 		&item.UpdatedByName,
 		&item.UpdatedAt,
+		&item.TodayOrders,
+		&item.TodayWeight,
+		&item.TodayRevenue,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Service{}, ErrServiceNotFound
@@ -78,4 +87,19 @@ func (repo *Repository) FindByCode(ctx context.Context, code string) (Service, e
 	}
 
 	return item, nil
+}
+
+func (repo *Repository) Update(ctx context.Context, code string, pricePerKg int64, isActive bool, updatedBy int64) error {
+	cmd, err := repo.db.Exec(ctx, `
+		UPDATE services
+		SET price_per_kg = $1, is_active = $2, updated_by = $3
+		WHERE code = $4
+	`, pricePerKg, isActive, updatedBy, code)
+	if err != nil {
+		return fmt.Errorf("update service: %w", err)
+	}
+	if cmd.RowsAffected() == 0 {
+		return ErrServiceNotFound
+	}
+	return nil
 }

@@ -15,7 +15,11 @@ export type OrderStatus = 'DIBATALKAN' | 'DIPROSES' | 'MENUNGGU' | 'SELESAI' | '
 export type PaymentStatus = 'BELUM_BAYAR' | 'DP' | 'LUNAS'
 
 export interface UpdateOrderPayload {
-  notes: string
+  customer_name: string
+  customer_phone?: string | null
+  grind_level?: string | null
+  notes?: string | null
+  roast_level?: string | null
   service_code: string
   weight_grams: number
 }

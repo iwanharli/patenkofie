@@ -20,15 +20,16 @@ import (
 	"paten-kopi/backend/internal/customer"
 	"paten-kopi/backend/internal/dashboard"
 	"paten-kopi/backend/internal/database"
+	"paten-kopi/backend/internal/expense"
+	"paten-kopi/backend/internal/notification"
 	"paten-kopi/backend/internal/order"
 	"paten-kopi/backend/internal/payment"
 	"paten-kopi/backend/internal/pickup"
-	"paten-kopi/backend/internal/notification"
 	"paten-kopi/backend/internal/platform/config"
 	"paten-kopi/backend/internal/platform/logger"
 	reportpkg "paten-kopi/backend/internal/report"
-	services "paten-kopi/backend/internal/service"
 	auditpkg "paten-kopi/backend/internal/audit"
+	services "paten-kopi/backend/internal/service"
 	settingpkg "paten-kopi/backend/internal/setting"
 	userpkg "paten-kopi/backend/internal/user"
 )
@@ -48,12 +49,13 @@ func main() {
 	settingHandler := settingpkg.NewHandler(settingpkg.NewRepository(db), sessionStore, cfg.UploadDir, maxUploadBytes(cfg.MaxUploadMB))
 	authHandler := auth.NewHandler(auth.NewRepository(db), sessionStore)
 	customerHandler := customer.NewHandler(customer.NewRepository(db), sessionStore)
+	expenseHandler := expense.NewHandler(expense.NewRepository(db), sessionStore)
 	dashboardHandler := dashboard.NewHandler(dashboard.NewRepository(db), sessionStore)
 	orderHandler := order.NewHandler(order.NewRepository(db), sessionStore)
 	paymentHandler := payment.NewHandler(payment.NewRepository(db), sessionStore)
 	pickupHandler := pickup.NewHandler(pickup.NewRepository(db), sessionStore, cfg.UploadDir, maxUploadBytes(cfg.MaxUploadMB))
 	reportHandler := reportpkg.NewHandler(reportpkg.NewRepository(db), sessionStore)
-	serviceHandler := services.NewHandler(services.NewRepository(db))
+	serviceHandler := services.NewHandler(services.NewRepository(db), sessionStore)
 	userHandler := userpkg.NewHandler(userpkg.NewRepository(db), sessionStore, cfg.UploadDir, maxUploadBytes(cfg.MaxUploadMB))
 	notificationHandler := notification.NewHandler(notification.NewRepository(db), sessionStore)
 
@@ -112,8 +114,15 @@ func main() {
 	router.Get("/api/v1/settings/backup", settingHandler.DownloadBackup)
 
 	router.Get("/api/v1/services", serviceHandler.List)
-	router.Get("/api/v1/dashboard", dashboardHandler.Overview)
 	router.Get("/api/v1/services/{code}", serviceHandler.Detail)
+	router.Patch("/api/v1/services/{code}", serviceHandler.Update)
+
+	router.Get("/api/v1/expenses", expenseHandler.List)
+	router.Post("/api/v1/expenses", expenseHandler.Create)
+	router.Patch("/api/v1/expenses/{id}", expenseHandler.Update)
+	router.Delete("/api/v1/expenses/{id}", expenseHandler.Delete)
+
+	router.Get("/api/v1/dashboard", dashboardHandler.Overview)
 	router.Get("/api/v1/customers/suggestions", customerHandler.Suggestions)
 	router.Get("/api/v1/customers/{id}", customerHandler.Detail)
 	router.Patch("/api/v1/customers/{id}", customerHandler.Update)

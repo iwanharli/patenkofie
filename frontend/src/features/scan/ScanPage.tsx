@@ -3,11 +3,13 @@ import { Camera, CameraOff, CheckCircle2, Keyboard, QrCode, Search } from 'lucid
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 
+import { AppModal } from '@/components/common/AppModal'
 import { PageHeader } from '@/components/common/PageHeader'
 import { useToast } from '@/components/feedback/useToast'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { fetchOrder, updateOrderStatus, type OrderRecord, type OrderStatus } from '../orders/ordersApi'
 
 export function ScanPage() {
   const navigate = useNavigate()
@@ -16,9 +18,13 @@ export function ScanPage() {
   const [isCameraActive, setIsCameraActive] = useState(false)
   const [cameras, setCameras] = useState<Array<{ id: string; label: string }>>([])
   const [selectedCameraId, setSelectedCameraId] = useState<string>('')
-  const [targetMode, setTargetMode] = useState<'detail' | 'pickup'>('detail')
+  const [targetMode, setTargetMode] = useState<'detail' | 'pickup' | 'quick-update'>('detail')
   const [manualCode, setManualCode] = useState('')
   const [scannedCode, setScannedCode] = useState('')
+
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [quickUpdateOrder, setQuickUpdateOrder] = useState<OrderRecord | null>(null)
 
   const html5QrcodeRef = useRef<Html5Qrcode | null>(null)
   const scannerContainerId = 'qr-reader-container'
@@ -112,6 +118,11 @@ export function ScanPage() {
     setScannedCode(code)
     void stopScanner()
 
+    if (targetMode === 'quick-update') {
+      void handleQuickUpdateFlow(code)
+      return
+    }
+
     toast({
       description: `QR ${code} berhasil dibaca. Mengarahkan ke halaman...`,
       title: 'QR Terdeteksi',
@@ -120,6 +131,67 @@ export function ScanPage() {
 
     const dest = targetMode === 'pickup' ? `/orders/${code}/pickup` : `/orders/${code}`
     navigate(dest)
+  }
+
+  async function handleQuickUpdateFlow(code: string) {
+    try {
+      const order = await fetchOrder(code)
+      if (order.order_status === 'SELESAI' || order.order_status === 'DIBATALKAN') {
+        toast({
+          title: 'Tidak Dapat Diupdate',
+          description: `Pesanan ${code} sudah berstatus ${order.order_status}.`,
+          variant: 'destructive',
+        })
+        void startScanner()
+        return
+      }
+      setQuickUpdateOrder(order)
+      setIsUpdateModalOpen(true)
+    } catch {
+      toast({
+        title: 'Error',
+        description: `Gagal mengambil data pesanan ${code}.`,
+        variant: 'destructive',
+      })
+      void startScanner()
+    }
+  }
+
+  async function executeQuickUpdate() {
+    if (!quickUpdateOrder) return
+    setIsUpdating(true)
+    try {
+      let nextStatus: OrderStatus = 'DIPROSES'
+      if (quickUpdateOrder.order_status === 'DIPROSES') nextStatus = 'SIAP_DIAMBIL'
+      else if (quickUpdateOrder.order_status === 'SIAP_DIAMBIL') {
+        navigate(`/orders/${quickUpdateOrder.order_code}/pickup`)
+        return
+      }
+
+      await updateOrderStatus(quickUpdateOrder.order_code, nextStatus, 'Diupdate cepat via Barcode Scanner')
+      toast({
+        title: 'Status Diperbarui',
+        description: `Pesanan ${quickUpdateOrder.order_code} kini berstatus ${nextStatus}.`,
+        variant: 'success',
+      })
+      setIsUpdateModalOpen(false)
+      setQuickUpdateOrder(null)
+      void startScanner() // resume scanner for next item
+    } catch (error) {
+      toast({
+        title: 'Update Gagal',
+        description: error instanceof Error ? error.message : 'Terjadi kesalahan.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  function handleCancelUpdate() {
+    setIsUpdateModalOpen(false)
+    setQuickUpdateOrder(null)
+    void startScanner()
   }
 
   function handleManualSubmit(e: FormEvent) {
@@ -166,7 +238,7 @@ export function ScanPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Target Mode Selector */}
-            <div className="flex items-center gap-2 rounded-lg bg-muted p-1">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 rounded-lg bg-muted p-1">
               <button
                 className={`flex-1 rounded-md py-1.5 text-xs font-semibold transition-all ${
                   targetMode === 'detail'
@@ -176,7 +248,18 @@ export function ScanPage() {
                 onClick={() => setTargetMode('detail')}
                 type="button"
               >
-                Buka Detail Order
+                Detail Order
+              </button>
+              <button
+                className={`flex-1 rounded-md py-1.5 text-xs font-semibold transition-all ${
+                  targetMode === 'quick-update'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                onClick={() => setTargetMode('quick-update')}
+                type="button"
+              >
+                Update Cepat
               </button>
               <button
                 className={`flex-1 rounded-md py-1.5 text-xs font-semibold transition-all ${
@@ -187,7 +270,7 @@ export function ScanPage() {
                 onClick={() => setTargetMode('pickup')}
                 type="button"
               >
-                Buka Serah Terima (Foto Pickup)
+                Serah Terima
               </button>
             </div>
 
@@ -275,6 +358,49 @@ export function ScanPage() {
           </CardContent>
         </Card>
       </section>
+
+      {/* Quick Update Modal */}
+      {quickUpdateOrder && (
+        <AppModal
+          description="Konfirmasi pembaruan status transaksi ke tahap selanjutnya."
+          onOpenChange={(open) => {
+            if (!open) handleCancelUpdate()
+          }}
+          open={isUpdateModalOpen}
+          title={`Update Status: ${quickUpdateOrder.order_code}`}
+        >
+          <div className="space-y-4 pt-2">
+            <div className="rounded-md border border-border bg-secondary/50 p-4">
+              <p className="text-sm">
+                Pelanggan: <span className="font-semibold">{quickUpdateOrder.customer_name}</span>
+              </p>
+              <p className="text-sm">
+                Layanan: <span className="font-semibold">{quickUpdateOrder.service_name} ({quickUpdateOrder.weight_kg} kg)</span>
+              </p>
+              <div className="mt-3 flex items-center gap-2 text-sm font-medium">
+                <span className="text-muted-foreground">{quickUpdateOrder.order_status}</span>
+                <span className="text-muted-foreground">→</span>
+                <span className="text-primary">
+                  {quickUpdateOrder.order_status === 'MENUNGGU'
+                    ? 'DIPROSES'
+                    : quickUpdateOrder.order_status === 'DIPROSES'
+                      ? 'SIAP_DIAMBIL'
+                      : 'SERAH_TERIMA (Beralih halaman)'}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2">
+              <Button disabled={isUpdating} onClick={handleCancelUpdate} variant="outline">
+                Batal
+              </Button>
+              <Button disabled={isUpdating} onClick={() => void executeQuickUpdate()}>
+                {isUpdating ? 'Memproses...' : 'Ya, Update Status'}
+              </Button>
+            </div>
+          </div>
+        </AppModal>
+      )}
     </>
   )
 }

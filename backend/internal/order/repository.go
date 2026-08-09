@@ -749,11 +749,16 @@ func (repo *Repository) UpdateOrder(ctx context.Context, orderCode string, input
 		paymentStatus = "DP"
 	}
 
+	customerID, err := repo.upsertCustomer(ctx, tx, input.CustomerName, input.CustomerPhone, nil)
+	if err != nil {
+		return Order{}, fmt.Errorf("upsert customer: %w", err)
+	}
+
 	_, err = tx.Exec(ctx, `
 		UPDATE orders
-		SET service_id = $2, weight_kg = $3, total_amount = $4, payment_status = $5, notes = $6
+		SET customer_id = $2, service_id = $3, weight_kg = $4, total_amount = $5, payment_status = $6, roast_level = $7, grind_level = $8, notes = $9
 		WHERE id = $1
-	`, current.ID, serviceID, weightKg, totalAmount, paymentStatus, input.Notes)
+	`, current.ID, customerID, serviceID, weightKg, totalAmount, paymentStatus, input.RoastLevel, input.GrindLevel, input.Notes)
 	if err != nil {
 		return Order{}, fmt.Errorf("update order: %w", err)
 	}

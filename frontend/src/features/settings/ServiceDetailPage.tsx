@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { SettingsTabs } from '@/features/settings/SettingsTabs'
-import { fetchService, type ServiceRecord } from '@/features/settings/servicesApi'
+import { fetchService, updateService, type ServiceRecord } from '@/features/settings/servicesApi'
 import { formatRupiah } from '@/utils/format'
 
 export function ServiceDetailPage() {
@@ -20,6 +20,8 @@ export function ServiceDetailPage() {
   const [service, setService] = useState<ServiceRecord | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
+  const [priceStr, setPriceStr] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -34,6 +36,7 @@ export function ServiceDetailPage() {
       .then((data) => {
         if (isMounted) {
           setService(data)
+          setPriceStr(data.price_per_kg.toString())
           setErrorMessage('')
         }
       })
@@ -52,6 +55,30 @@ export function ServiceDetailPage() {
       isMounted = false
     }
   }, [params.serviceCode])
+
+  const handleSave = async () => {
+    if (!service) return
+    setIsSaving(true)
+    const newPrice = parseInt(priceStr.replace(/\D/g, ''), 10)
+    try {
+      const updated = await updateService(service.code, { price_per_kg: newPrice || 0 })
+      setService(updated)
+      setPriceStr(updated.price_per_kg.toString())
+      toast({
+        title: 'Tersimpan',
+        description: 'Harga layanan berhasil diperbarui.',
+        variant: 'success',
+      })
+    } catch (err: any) {
+      toast({
+        title: 'Gagal menyimpan',
+        description: err.message,
+        variant: 'destructive',
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -95,17 +122,9 @@ export function ServiceDetailPage() {
         <Card>
           <CardHeader className="gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle>Konfigurasi harga</CardTitle>
-            <Button
-              onClick={() => {
-                toast({
-                  description: 'Komponen toast reusable sudah aktif. Endpoint update harga bisa disambungkan berikutnya.',
-                  title: 'Perubahan harga belum disimpan',
-                  variant: 'warning',
-                })
-              }}
-            >
+            <Button onClick={handleSave} disabled={isSaving || !priceStr}>
               <Save aria-hidden="true" className="size-4" />
-              Simpan mock
+              {isSaving ? 'Menyimpan...' : 'Simpan'}
             </Button>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
@@ -118,8 +137,11 @@ export function ServiceDetailPage() {
               <Input readOnly value={service.name} />
             </div>
             <div className="space-y-2">
-              <Label>Harga per kg</Label>
-              <Input defaultValue={formatRupiah(service.price_per_kg)} />
+              <Label>Harga per kg (Rp)</Label>
+              <Input 
+                value={priceStr} 
+                onChange={(e) => setPriceStr(e.target.value.replace(/\D/g, ''))}
+              />
             </div>
             <div className="space-y-2">
               <Label>Status</Label>
@@ -134,11 +156,11 @@ export function ServiceDetailPage() {
               <CardTitle>Ringkasan hari ini</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Info label="Order" value="Belum dihitung" />
+              <Info label="Order" value={`${service.today_orders} order`} />
               <Separator />
-              <Info label="Volume" value="Belum dihitung" />
+              <Info label="Volume" value={`${service.today_weight} kg`} />
               <Separator />
-              <Info label="Nilai transaksi" value="Belum dihitung" />
+              <Info label="Nilai transaksi" value={formatRupiah(service.today_revenue)} />
               <Separator />
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Status</span>
