@@ -258,10 +258,11 @@ Seluruh fitur operasional kasir dan manajemen roasting kopi PatenAndum telah **1
 
 Saat ini aplikasi sudah masuk standar **MVP (Minimum Viable Product)** untuk operasional roastery sehari-hari, meliputi kasir, pencatatan produksi, dan penyerahan barang dengan foto bukti.
 
+**Sudah Selesai:**
+- **Modul Kas Kecil (Petty Cash):** Pencatatan arus kas keluar harian (listrik, perlengkapan toko, dll), terintegrasi ke ringkasan Kas Bersih di dashboard.
+
 **Pengembangan Selanjutnya (Fitur Prioritas Berikutnya):**
-- **Modul Kas Kecil (Petty Cash):**
-  - Pencatatan arus kas keluar harian (misal: bayar listrik, beli perlengkapan toko).
-  - Penyesuaian rekonsiliasi kas (Total Uang Fisik = Kas Masuk - Kas Keluar) agar laporan tutup buku lebih akurat.
+- **Rekonsiliasi Kas / Shift Management:** Buka/tutup shift kasir dengan perhitungan Total Uang Fisik = Kas Masuk - Kas Keluar agar laporan tutup buku lebih akurat.
 - **Manajemen Stok / Gudang (Inventory):**
   - Pencatatan stok barang masuk (kopi mentah / green beans).
   - Fitur mutasi stok & perhitungan shrinkage otomatis setelah roasting.
