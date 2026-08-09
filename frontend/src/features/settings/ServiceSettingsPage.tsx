@@ -60,7 +60,7 @@ export function ServiceSettingsPage() {
         <CardHeader className="gap-3 md:flex-row md:items-center md:justify-between">
           <CardTitle>Layanan aktif</CardTitle>
           <AppModal
-            description="Komponen modal reusable untuk form singkat. Penyimpanan layanan asli bisa disambungkan ke API berikutnya."
+            description="Penambahan layanan baru dibatasi oleh constraint database (hanya mendukung G, R, dan GR saat ini)."
             footer={
               <>
                 <DialogClose asChild>
@@ -70,13 +70,13 @@ export function ServiceSettingsPage() {
                   <Button
                     onClick={() => {
                       toast({
-                        description: 'Form layanan sudah siap dipakai ulang ketika endpoint tambah layanan dibuat.',
-                        title: 'Modal layanan ditampilkan',
-                        variant: 'success',
+                        description: 'Silakan hubungi administrator untuk menambahkan kode layanan baru ke database.',
+                        title: 'Dibatasi oleh sistem',
+                        variant: 'warning',
                       })
                     }}
                   >
-                    Simpan mock
+                    Simpan
                   </Button>
                 </DialogClose>
               </>

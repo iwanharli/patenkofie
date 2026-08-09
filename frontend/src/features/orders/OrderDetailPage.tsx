@@ -8,12 +8,12 @@ import {
   PackageCheck,
   Pencil,
   Printer,
-  QrCode,
   Save,
   Trash2,
   UserRound,
   ZoomIn,
 } from 'lucide-react'
+import QRCode from 'qrcode'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 
@@ -74,6 +74,23 @@ export function OrderDetailPage() {
   const [editWeightValue, setEditWeightValue] = useState('')
   const [editWeightUnit, setEditWeightUnit] = useState<'KG' | 'GRAM'>('KG')
   const [editNotes, setEditNotes] = useState('')
+  const [editCustomerName, setEditCustomerName] = useState('')
+  const [editCustomerPhone, setEditCustomerPhone] = useState('')
+  const [editRoastLevel, setEditRoastLevel] = useState('NONE')
+  const [editGrindLevel, setEditGrindLevel] = useState('')
+  const [qrDataUrl, setQrDataUrl] = useState('')
+
+  useEffect(() => {
+    if (!order) return
+    const detailUrl = `${window.location.origin}/orders/${order.order_code}`
+    QRCode.toDataURL(detailUrl, {
+      errorCorrectionLevel: 'M',
+      margin: 1,
+      width: 200,
+    })
+      .then(setQrDataUrl)
+      .catch(() => {})
+  }, [order])
 
   const canDelete = user?.role === 'OWNER' && Boolean(order)
   const canEdit = Boolean(order && (order.order_status === 'MENUNGGU' || order.order_status === 'DIPROSES'))
@@ -89,6 +106,10 @@ export function OrderDetailPage() {
     fetchServices()
       .then((items) => {
         setServicesList(items)
+        setEditCustomerName(order.customer_name)
+        setEditCustomerPhone(order.customer_phone ?? '')
+        setEditRoastLevel(order.roast_level ?? 'NONE')
+        setEditGrindLevel(order.grind_level ?? '')
         setEditServiceCode(order.service_code)
         setEditWeightValue(order.weight_kg)
         setEditWeightUnit('KG')
@@ -109,6 +130,14 @@ export function OrderDetailPage() {
 
   async function handleSaveEdit() {
     if (!order) return
+    if (!editCustomerName.trim()) {
+      toast({
+        description: 'Nama pelanggan tidak boleh kosong.',
+        title: 'Input Tidak Valid',
+        variant: 'destructive',
+      })
+      return
+    }
     const rawVal = parseFloat(editWeightValue)
     if (isNaN(rawVal) || rawVal <= 0) {
       toast({
@@ -124,7 +153,11 @@ export function OrderDetailPage() {
     setIsSavingEdit(true)
     try {
       const updated = await updateOrder(order.order_code, {
+        customer_name: editCustomerName.trim(),
+        customer_phone: editCustomerPhone.trim() || null,
+        grind_level: editGrindLevel.trim() || null,
         notes: editNotes,
+        roast_level: editRoastLevel !== 'NONE' ? editRoastLevel : null,
         service_code: editServiceCode,
         weight_grams: weightGrams,
       })
@@ -336,12 +369,7 @@ export function OrderDetailPage() {
                 Cetak struk
               </Link>
             </Button>
-            {canEdit && (
-              <Button onClick={handleOpenEditModal} variant="outline">
-                <Pencil aria-hidden="true" className="size-4" />
-                Ubah Transaksi
-              </Button>
-            )}
+
             {canDelete && (
               <ConfirmModal
                 confirmLabel="Hapus"
@@ -361,7 +389,39 @@ export function OrderDetailPage() {
         }
         description={`${order.customer_name} - ${order.service_name} - ${formatWeight(order.weight_kg)}`}
         eyebrow="Detail transaksi"
-        title={order.order_code}
+        title={
+          <div className="flex items-center gap-3">
+            <span>{order.order_code}</span>
+            {qrDataUrl && (
+              <Dialog>
+                <DialogTrigger asChild>
+                  <button className="group relative overflow-hidden rounded-md border border-border bg-white p-1 shadow-sm transition-all hover:ring-2 hover:ring-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <img
+                      alt={`QR ${order.order_code}`}
+                      className="size-8 object-contain transition-transform group-hover:scale-105"
+                      src={qrDataUrl}
+                    />
+                    <div className="absolute inset-0 grid place-items-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
+                      <ZoomIn className="size-4 text-white opacity-80" />
+                    </div>
+                  </button>
+                </DialogTrigger>
+                <DialogContent className="max-w-sm border-none bg-transparent p-0 shadow-none">
+                  <div className="rounded-xl border border-border bg-white p-6 shadow-2xl">
+                    <img
+                      alt={`QR ${order.order_code} Fullscreen`}
+                      className="h-auto w-full rounded object-contain"
+                      src={qrDataUrl}
+                    />
+                    <p className="mt-4 text-center text-sm font-semibold text-foreground">
+                      Scan QR dari layar untuk membuka order
+                    </p>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
+        }
       />
 
       <section className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
@@ -713,15 +773,7 @@ export function OrderDetailPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="grid place-items-center gap-3 p-6 text-center">
-              <div className="grid size-32 place-items-center rounded-md border border-border bg-muted">
-                <QrCode aria-hidden="true" className="size-16 text-primary" />
-              </div>
-              <p className="text-sm font-semibold">{order.order_code}</p>
-              <p className="text-xs text-muted-foreground">Label QR untuk scan pengambilan.</p>
-            </CardContent>
-          </Card>
+
         </aside>
       </section>
 
@@ -732,6 +784,27 @@ export function OrderDetailPage() {
         title={`Ubah Transaksi ${order.order_code}`}
       >
         <div className="space-y-4 pt-2">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="text-xs font-semibold uppercase text-muted-foreground">Nama Pelanggan</label>
+              <Input
+                className="mt-1"
+                onChange={(e) => setEditCustomerName(e.target.value)}
+                placeholder="Nama lengkap"
+                value={editCustomerName}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold uppercase text-muted-foreground">Telepon Pelanggan</label>
+              <Input
+                className="mt-1"
+                onChange={(e) => setEditCustomerPhone(e.target.value)}
+                placeholder="Nomor HP/WA"
+                value={editCustomerPhone}
+              />
+            </div>
+          </div>
+
           <div>
             <label className="text-xs font-semibold uppercase text-muted-foreground">Jenis Layanan</label>
             <Select value={editServiceCode} onValueChange={setEditServiceCode}>
@@ -784,6 +857,33 @@ export function OrderDetailPage() {
               type="number"
               value={editWeightValue}
             />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="text-xs font-semibold uppercase text-muted-foreground">Level Roasting</label>
+              <Select value={editRoastLevel} onValueChange={setEditRoastLevel}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Pilih level" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NONE">- Tidak Ada -</SelectItem>
+                  <SelectItem value="LIGHT">Light</SelectItem>
+                  <SelectItem value="MEDIUM">Medium</SelectItem>
+                  <SelectItem value="DARK">Dark</SelectItem>
+                  <SelectItem value="CUSTOM">Custom</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold uppercase text-muted-foreground">Level Giling</label>
+              <Input
+                className="mt-1"
+                onChange={(e) => setEditGrindLevel(e.target.value)}
+                placeholder="Contoh: Kasar, Halus, Espresso"
+                value={editGrindLevel}
+              />
+            </div>
           </div>
 
           <div>

@@ -5,7 +5,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router'
 
 import { navigationItems } from '@/components/layout/navigation'
@@ -19,19 +19,34 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAuth } from '@/features/auth/useAuth'
+import { fetchDashboardOverview } from '@/features/dashboard/dashboardApi'
 import { cn } from '@/lib/utils'
+import { formatRupiah } from '@/utils/format'
 
 interface SidebarProps {
   isCollapsed: boolean
   onToggle: () => void
+  appName?: string
 }
 
-export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
+export function Sidebar({ isCollapsed, onToggle, appName }: SidebarProps) {
   const location = useLocation()
   const { user } = useAuth()
   const [isSettingsOpen, setIsSettingsOpen] = useState(
     location.pathname.startsWith('/settings'),
   )
+  const [cashSummary, setCashSummary] = useState({ amount: 0, payments: 0 })
+
+  useEffect(() => {
+    fetchDashboardOverview()
+      .then(data => {
+        setCashSummary({
+          amount: data.summary.cash_amount_today,
+          payments: data.summary.cash_payments_today
+        })
+      })
+      .catch(() => {})
+  }, [])
 
   const ToggleIcon = isCollapsed ? PanelLeftOpen : PanelLeftClose
   const isActive = (href?: string) =>
@@ -54,7 +69,7 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
           <Coffee aria-hidden="true" className="size-5" />
         </div>
         <div className={cn('min-w-0 flex-1', isCollapsed && 'hidden')}>
-          <p className="text-base font-semibold leading-5">PatenAndum</p>
+          <p className="text-base font-semibold leading-5">{appName || 'PatenAndum'}</p>
           <p className="text-xs text-muted-foreground">Admin operasional</p>
         </div>
         <Tooltip>
@@ -208,7 +223,7 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
                 <Banknote aria-hidden="true" className="size-5" />
               </div>
             </TooltipTrigger>
-            <TooltipContent side="right">Kas hari ini Rp1.820.000</TooltipContent>
+            <TooltipContent side="right">Kas hari ini {formatRupiah(cashSummary.amount)}</TooltipContent>
           </Tooltip>
         ) : (
           <div className="rounded-lg border border-border bg-background p-4">
@@ -216,8 +231,8 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
               <p className="text-sm font-medium">Kas hari ini</p>
               <Badge variant="success">Tunai</Badge>
             </div>
-            <p className="mt-3 text-2xl font-semibold">Rp1.820.000</p>
-            <p className="mt-1 text-xs text-muted-foreground">8 pembayaran tercatat</p>
+            <p className="mt-3 text-2xl font-semibold">{formatRupiah(cashSummary.amount)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{cashSummary.payments} pembayaran tercatat</p>
           </div>
         )}
       </div>

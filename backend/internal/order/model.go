@@ -16,10 +16,14 @@ type CreateOrderInput struct {
 }
 
 type UpdateOrderInput struct {
-	ServiceCode string
-	WeightGrams int64
-	Notes       *string
-	ActorID     int64
+	CustomerName  string
+	CustomerPhone *string
+	ServiceCode   string
+	WeightGrams   int64
+	RoastLevel    *string
+	GrindLevel    *string
+	Notes         *string
+	ActorID       int64
 }
 
 type UpdateOrderStatusInput struct {

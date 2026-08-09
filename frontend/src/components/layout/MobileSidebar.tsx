@@ -10,9 +10,10 @@ import { cn } from '@/lib/utils'
 interface MobileSidebarProps {
   isOpen: boolean
   onClose: () => void
+  appName?: string
 }
 
-export function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
+export function MobileSidebar({ isOpen, onClose, appName }: MobileSidebarProps) {
   const location = useLocation()
   const { user } = useAuth()
   const [isSettingsOpen, setIsSettingsOpen] = useState(
@@ -49,7 +50,7 @@ export function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
             <Coffee aria-hidden="true" className="size-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-base font-semibold leading-5">PatenAndum</p>
+            <p className="text-base font-semibold leading-5">{appName || 'PatenAndum'}</p>
             <p className="text-xs text-muted-foreground">Admin operasional</p>
           </div>
           <Button aria-label="Tutup menu" onClick={onClose} size="icon" variant="ghost">

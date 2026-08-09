@@ -243,9 +243,13 @@ func (handler *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	code := chi.URLParam(r, "code")
 
 	var request struct {
-		ServiceCode string `json:"service_code"`
-		WeightGrams int64  `json:"weight_grams"`
-		Notes       string `json:"notes"`
+		CustomerName  string  `json:"customer_name"`
+		CustomerPhone *string `json:"customer_phone"`
+		ServiceCode   string  `json:"service_code"`
+		WeightGrams   int64   `json:"weight_grams"`
+		RoastLevel    *string `json:"roast_level"`
+		GrindLevel    *string `json:"grind_level"`
+		Notes         string  `json:"notes"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		writeError(w, http.StatusBadRequest, "INVALID_JSON", "Request tidak valid")
@@ -262,11 +266,20 @@ func (handler *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if strings.TrimSpace(request.CustomerName) == "" {
+		writeError(w, http.StatusBadRequest, "CUSTOMER_NAME_REQUIRED", "Nama pelanggan wajib diisi")
+		return
+	}
+
 	item, err := handler.repo.UpdateOrder(r.Context(), code, UpdateOrderInput{
-		ActorID:     userID,
-		Notes:       optionalString(request.Notes),
-		ServiceCode: serviceCode,
-		WeightGrams: request.WeightGrams,
+		ActorID:       userID,
+		CustomerName:  strings.TrimSpace(request.CustomerName),
+		CustomerPhone: request.CustomerPhone,
+		Notes:         optionalString(request.Notes),
+		ServiceCode:   serviceCode,
+		WeightGrams:   request.WeightGrams,
+		RoastLevel:    request.RoastLevel,
+		GrindLevel:    request.GrindLevel,
 	})
 	if errors.Is(err, ErrOrderNotFound) {
 		writeError(w, http.StatusNotFound, "ORDER_NOT_FOUND", "Transaksi tidak ditemukan")
