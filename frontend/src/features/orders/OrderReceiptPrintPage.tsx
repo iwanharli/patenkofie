@@ -1,6 +1,7 @@
 import { ArrowLeft, Printer } from 'lucide-react'
+import QRCode from 'qrcode'
 import type { ReactNode } from 'react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 
 import { Button } from '@/components/ui/button'
@@ -19,8 +20,14 @@ export function OrderReceiptPrintPage() {
   const [receiptFooter, setReceiptFooter] = useState('Terima kasih atas kunjungan Anda!')
   const [isLoading, setIsLoading] = useState(Boolean(params.orderCode))
   const [isProfileSettled, setIsProfileSettled] = useState(false)
+  const [qrDataUrl, setQrDataUrl] = useState('')
+  const [isQrSettled, setIsQrSettled] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const hasPrintedRef = useRef(false)
+  const detailUrl = useMemo(
+    () => (order ? `${window.location.origin}/orders/${order.order_code}` : ''),
+    [order],
+  )
 
   useEffect(() => {
     fetchBusinessProfile().then((profile) => {
@@ -29,6 +36,30 @@ export function OrderReceiptPrintPage() {
       if (profile.receipt_footer) setReceiptFooter(profile.receipt_footer)
     }).catch(() => {}).finally(() => setIsProfileSettled(true))
   }, [])
+
+  useEffect(() => {
+    let isMounted = true
+
+    if (!detailUrl) {
+      setQrDataUrl('')
+      return
+    }
+
+    QRCode.toDataURL(detailUrl, { errorCorrectionLevel: 'M', margin: 1, scale: 6, width: 160 })
+      .then((dataUrl) => {
+        if (isMounted) setQrDataUrl(dataUrl)
+      })
+      .catch(() => {
+        if (isMounted) setQrDataUrl('')
+      })
+      .finally(() => {
+        if (isMounted) setIsQrSettled(true)
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [detailUrl])
 
   useEffect(() => {
     if (!isAutoPrint) {
@@ -40,10 +71,11 @@ export function OrderReceiptPrintPage() {
     return () => window.removeEventListener('afterprint', handleAfterPrint)
   }, [isAutoPrint])
 
-  // Only fire once the order *and* the shop profile have resolved, otherwise
-  // the receipt would go to paper with a placeholder header.
+  // Only fire once the order, the shop profile *and* the QR image have
+  // resolved, otherwise the receipt goes to paper with a placeholder header or
+  // an empty QR box.
   useEffect(() => {
-    if (!isAutoPrint || hasPrintedRef.current || isLoading || !isProfileSettled) {
+    if (!isAutoPrint || hasPrintedRef.current || isLoading || !isProfileSettled || !isQrSettled) {
       return
     }
 
@@ -61,7 +93,7 @@ export function OrderReceiptPrintPage() {
     }, 150)
 
     return () => window.clearTimeout(timer)
-  }, [isAutoPrint, isLoading, isProfileSettled, order])
+  }, [isAutoPrint, isLoading, isProfileSettled, isQrSettled, order])
 
   useEffect(() => {
     let isMounted = true
@@ -181,7 +213,15 @@ export function OrderReceiptPrintPage() {
         </div>
 
         {/* Footer Struk */}
-        <div className="text-center text-[9px] leading-tight mt-6">
+        {/* Scanning this opens the order, which is what the footer text refers to. */}
+        {qrDataUrl && (
+          <div className="mt-5 flex flex-col items-center gap-1">
+            <img alt={`QR ${order.order_code}`} className="size-24" src={qrDataUrl} />
+            <p className="text-[8px] leading-tight">Scan untuk cek status pesanan</p>
+          </div>
+        )}
+
+        <div className="text-center text-[9px] leading-tight mt-4">
           <p className="whitespace-pre-wrap">{receiptFooter}</p>
         </div>
       </section>
