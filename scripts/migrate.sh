@@ -10,7 +10,8 @@ MIGRATIONS_DIR="${MIGRATIONS_DIR:-backend/migrations}"
 
 if [ -n "${DATABASE_URL:-}" ]; then
   TARGET="${DATABASE_URL}"
-  LABEL="${DATABASE_URL##*/}"
+  LABEL="${DATABASE_URL##*/}"   # database name...
+  LABEL="${LABEL%%\?*}"         # ...without the connection options
 else
   DB_NAME="${DB_NAME:-db_patenandum}"
   if ! psql -d postgres -Atqc "SELECT 1 FROM pg_database WHERE datname = '${DB_NAME}'" | grep -q 1; then
