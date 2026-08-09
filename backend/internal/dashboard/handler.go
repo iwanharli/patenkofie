@@ -158,6 +158,7 @@ func overviewResponse(item Overview) map[string]any {
 			"cash_payments_today":       item.Summary.CashPaymentsToday,
 			"outstanding_amount_active": item.Summary.OutstandingAmountActive,
 			"outstanding_orders_active": item.Summary.OutstandingOrdersActive,
+			"expenses_today":            item.Summary.ExpensesToday,
 		},
 		"queues":             queues,
 		"recent_orders":      recentOrders,
