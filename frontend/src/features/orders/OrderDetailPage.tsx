@@ -36,6 +36,7 @@ import {
   updateOrder,
   updateOrderStatus,
 } from '@/features/orders/ordersApi'
+import { useReceiptPrint } from '@/features/orders/useReceiptPrint'
 import { fetchPickup, type PickupRecord } from '@/features/orders/pickupsApi'
 import { OrderStatusBadge, PaymentStatusBadge } from '@/features/orders/status'
 import { settleOrderPayment } from '@/features/payments/paymentsApi'
@@ -57,6 +58,14 @@ export function OrderDetailPage() {
   const navigate = useNavigate()
   const { toast } = useToast()
   const { user } = useAuth()
+  const { isPreparing: isPreparingReceipt, printReceipt } = useReceiptPrint({
+    onError: () =>
+      toast({
+        title: 'Gagal mencetak',
+        description: 'Struk gagal disiapkan. Coba lagi.',
+        variant: 'destructive',
+      }),
+  })
   const [order, setOrder] = useState<OrderRecord | null>(null)
   const [pickup, setPickup] = useState<PickupRecord | null>(null)
   const [isLoading, setIsLoading] = useState(Boolean(params.orderCode))
@@ -363,11 +372,13 @@ export function OrderDetailPage() {
                 Cetak label
               </Link>
             </Button>
-            <Button asChild variant="outline">
-              <Link target="_blank" to={`/print/orders/${order.order_code}/receipt`}>
-                <Printer aria-hidden="true" className="size-4" />
-                Cetak struk
-              </Link>
+            <Button
+              disabled={isPreparingReceipt}
+              onClick={() => printReceipt(order.order_code)}
+              variant="outline"
+            >
+              <Printer aria-hidden="true" className="size-4" />
+              {isPreparingReceipt ? 'Menyiapkan...' : 'Cetak struk'}
             </Button>
 
             {canDelete && (
