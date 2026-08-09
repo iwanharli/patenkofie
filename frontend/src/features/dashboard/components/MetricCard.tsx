@@ -11,7 +11,7 @@ const toneClassNames = {
 }
 
 interface MetricCardProps {
-  detail: string
+  detail: React.ReactNode
   icon: LucideIcon
   label: string
   tone: keyof typeof toneClassNames
@@ -25,7 +25,7 @@ export function MetricCard({ detail, icon: Icon, label, tone, value }: MetricCar
         <div className="min-w-0">
           <p className="text-sm font-medium text-muted-foreground">{label}</p>
           <p className="mt-2 text-2xl font-semibold tracking-normal">{value}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
+          <div className="mt-1 text-xs text-muted-foreground">{detail}</div>
         </div>
         <div className={cn('grid size-10 shrink-0 place-items-center rounded-md', toneClassNames[tone])}>
           <Icon aria-hidden="true" className="size-5" />

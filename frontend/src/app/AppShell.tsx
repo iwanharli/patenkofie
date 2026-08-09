@@ -5,6 +5,7 @@ import { AuditDetailPage } from '@/features/audit/AuditDetailPage'
 import { AuditLogsSettingsPage } from '@/features/audit/AuditLogsSettingsPage'
 import { RequireAuth } from '@/features/auth/RequireAuth'
 import { DashboardPage } from '@/features/dashboard/DashboardPage'
+import { ExpensesPage } from '@/features/expenses/ExpensesPage'
 import { CustomerDetailPage } from '@/features/customers/CustomerDetailPage'
 import { CustomersPage } from '@/features/customers/CustomersPage'
 import { LoginPage } from '@/features/auth/LoginPage'
@@ -58,6 +59,7 @@ export function AppShell() {
                 <Route element={<OrderDetailPage />} path="orders/:orderCode" />
                 <Route element={<PickupDetailPage />} path="orders/:orderCode/pickup" />
                 <Route element={<ScanPage />} path="scan" />
+                <Route element={<ExpensesPage />} path="expenses" />
                 <Route element={<CustomersPage />} path="customers" />
                 <Route element={<CustomerDetailPage />} path="customers/:customerId" />
                 <Route element={<PaymentsPage />} path="payments" />
