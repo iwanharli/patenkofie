@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node drive.mjs)",
+      "Bash(node frame.mjs)",
+      "Bash(node pagerule.mjs)",
+      "Bash(node btncheck.mjs)",
+      "Bash(lsof -ti:8080 -sTCP:LISTEN)"
+    ]
+  }
+}

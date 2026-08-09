@@ -1,29 +1,67 @@
 import { ArrowLeft, Printer } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useParams, useSearchParams } from 'react-router'
 
 import { Button } from '@/components/ui/button'
 import { fetchOrder, type OrderRecord } from '@/features/orders/ordersApi'
+import { postReceiptPrintStatus } from '@/features/orders/receiptPrintBridge'
 import { fetchBusinessProfile } from '@/features/settings/settingsApi'
 import { formatEnumLabel, formatRupiah, formatWeight } from '@/utils/format'
 
 export function OrderReceiptPrintPage() {
   const params = useParams()
+  const [searchParams] = useSearchParams()
+  const isAutoPrint = searchParams.get('autoprint') === '1'
   const [order, setOrder] = useState<OrderRecord | null>(null)
   const [businessName, setBusinessName] = useState('PatenAndum')
   const [businessAddress, setBusinessAddress] = useState('')
   const [receiptFooter, setReceiptFooter] = useState('Terima kasih atas kunjungan Anda!')
   const [isLoading, setIsLoading] = useState(Boolean(params.orderCode))
+  const [isProfileSettled, setIsProfileSettled] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  const hasPrintedRef = useRef(false)
 
   useEffect(() => {
     fetchBusinessProfile().then((profile) => {
       if (profile.business_name) setBusinessName(profile.business_name)
       if (profile.business_address) setBusinessAddress(profile.business_address)
       if (profile.receipt_footer) setReceiptFooter(profile.receipt_footer)
-    }).catch(() => {})
+    }).catch(() => {}).finally(() => setIsProfileSettled(true))
   }, [])
+
+  useEffect(() => {
+    if (!isAutoPrint) {
+      return
+    }
+
+    const handleAfterPrint = () => postReceiptPrintStatus('done')
+    window.addEventListener('afterprint', handleAfterPrint)
+    return () => window.removeEventListener('afterprint', handleAfterPrint)
+  }, [isAutoPrint])
+
+  // Only fire once the order *and* the shop profile have resolved, otherwise
+  // the receipt would go to paper with a placeholder header.
+  useEffect(() => {
+    if (!isAutoPrint || hasPrintedRef.current || isLoading || !isProfileSettled) {
+      return
+    }
+
+    if (!order) {
+      hasPrintedRef.current = true
+      postReceiptPrintStatus('error')
+      return
+    }
+
+    hasPrintedRef.current = true
+    const timer = window.setTimeout(() => {
+      window.focus()
+      postReceiptPrintStatus('ready')
+      window.print()
+    }, 150)
+
+    return () => window.clearTimeout(timer)
+  }, [isAutoPrint, isLoading, isProfileSettled, order])
 
   useEffect(() => {
     let isMounted = true
@@ -154,7 +192,15 @@ export function OrderReceiptPrintPage() {
 function PrintShell({ children, orderCode }: { children: ReactNode; orderCode?: string }) {
   return (
     <main className="min-h-svh bg-background p-5 print:bg-white print:p-0 flex flex-col items-center">
-      <style>{'@media print { @page { size: 58mm auto; margin: 2mm; } }'}</style>
+      {/*
+        No @page size here on purpose. CSS cannot express "58mm wide, height
+        follows the content": `size: 58mm auto` is invalid (a length may not be
+        mixed with auto) and browsers drop it, while `size: 58mm` would mean a
+        58x58mm square and paginate a longer receipt. Continuous roll paper is
+        the printer driver's job, so we leave the page size to it and constrain
+        the receipt body to 58mm instead.
+      */}
+      <style>{'@media print { @page { margin: 2mm; } }'}</style>
       <div className="mx-auto mb-4 flex w-full max-w-[420px] items-center justify-between gap-3 print:hidden">
         <Button asChild variant="outline">
           <Link to={orderCode ? `/orders/${orderCode}` : '/orders'}>

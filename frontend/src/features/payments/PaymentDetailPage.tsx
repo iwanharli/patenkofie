@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { useAuth } from '@/features/auth/useAuth'
 import { OrderStatusBadge, PaymentStatusBadge } from '@/features/orders/status'
+import { useReceiptPrint } from '@/features/orders/useReceiptPrint'
 import {
   fetchPayment,
   type PaymentRecord,
@@ -25,6 +26,14 @@ export function PaymentDetailPage() {
   const params = useParams()
   const navigate = useNavigate()
   const { toast } = useToast()
+  const { isPreparing: isPreparingReceipt, printReceipt } = useReceiptPrint({
+    onError: () =>
+      toast({
+        title: 'Gagal mencetak',
+        description: 'Struk gagal disiapkan. Coba lagi.',
+        variant: 'destructive',
+      }),
+  })
   const { user } = useAuth()
   const [payment, setPayment] = useState<PaymentRecord | null>(null)
   const [isLoading, setIsLoading] = useState(Boolean(params.paymentCode))
@@ -162,11 +171,13 @@ export function PaymentDetailPage() {
                 Kembali
               </Link>
             </Button>
-            <Button asChild variant="outline">
-              <Link target="_blank" to={`/print/orders/${payment.order_code}/receipt`}>
-                <Printer aria-hidden="true" className="size-4" />
-                Cetak struk
-              </Link>
+            <Button
+              disabled={isPreparingReceipt}
+              onClick={() => printReceipt(payment.order_code)}
+              variant="outline"
+            >
+              <Printer aria-hidden="true" className="size-4" />
+              {isPreparingReceipt ? 'Menyiapkan...' : 'Cetak struk'}
             </Button>
             {isOwner && (
               <>
