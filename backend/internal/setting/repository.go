@@ -3,12 +3,10 @@ package setting
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -18,23 +16,6 @@ type Repository struct {
 
 func NewRepository(db *pgxpool.Pool) *Repository {
 	return &Repository{db: db}
-}
-
-func (repo *Repository) IsOwner(ctx context.Context, userID int64) (bool, error) {
-	var role string
-	err := repo.db.QueryRow(ctx, `
-		SELECT role
-		FROM users
-		WHERE id = $1 AND is_active = true
-	`, userID).Scan(&role)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("find user role: %w", err)
-	}
-
-	return role == "OWNER", nil
 }
 
 func (repo *Repository) GetBusinessProfile(ctx context.Context) (BusinessProfile, error) {

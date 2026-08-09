@@ -61,17 +61,6 @@ func (handler *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	isOwner, err := handler.repo.IsOwner(r.Context(), userID)
-	if err != nil {
-		log.Error().Err(err).Msg("update profile role check failed")
-		writeError(w, http.StatusInternalServerError, "ROLE_CHECK_FAILED", "Role pengguna gagal diperiksa")
-		return
-	}
-	if !isOwner {
-		writeError(w, http.StatusForbidden, "OWNER_ONLY", "Hanya OWNER yang dapat mengubah profil toko")
-		return
-	}
-
 	var request struct {
 		BusinessName    string `json:"business_name"`
 		BusinessAddress string `json:"business_address"`
@@ -111,17 +100,6 @@ func (handler *Handler) DownloadBackup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	isOwner, err := handler.repo.IsOwner(r.Context(), userID)
-	if err != nil {
-		log.Error().Err(err).Msg("download backup role check failed")
-		writeError(w, http.StatusInternalServerError, "ROLE_CHECK_FAILED", "Role pengguna gagal diperiksa")
-		return
-	}
-	if !isOwner {
-		writeError(w, http.StatusForbidden, "OWNER_ONLY", "Hanya OWNER yang dapat mengunduh backup database")
-		return
-	}
-
 	backupData, filename, err := handler.repo.ExportBackup(r.Context())
 	if err != nil {
 		log.Error().Err(err).Msg("export backup failed")
@@ -137,17 +115,12 @@ func (handler *Handler) DownloadBackup(w http.ResponseWriter, r *http.Request) {
 }
 
 func (handler *Handler) currentUserID(r *http.Request) (int64, bool) {
-	cookie, err := r.Cookie(auth.SessionCookieName)
-	if err != nil {
-		return 0, false
-	}
-
-	session, ok := handler.sessionStore.Get(cookie.Value)
+	actor, ok := auth.ActorFrom(r.Context())
 	if !ok {
 		return 0, false
 	}
 
-	return session.UserID, true
+	return actor.UserID, true
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {
@@ -169,12 +142,6 @@ func (handler *Handler) UploadLogo(w http.ResponseWriter, r *http.Request) {
 	userID, ok := handler.currentUserID(r)
 	if !ok || userID == 0 {
 		writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "Session tidak valid")
-		return
-	}
-
-	isOwner, err := handler.repo.IsOwner(r.Context(), userID)
-	if err != nil || !isOwner {
-		writeError(w, http.StatusForbidden, "OWNER_ONLY", "Hanya OWNER yang dapat mengubah logo toko")
 		return
 	}
 

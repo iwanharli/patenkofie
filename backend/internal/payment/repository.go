@@ -459,23 +459,6 @@ func scanPayment(row paymentScanner, item *Payment, total *int64) error {
 	return nil
 }
 
-func (repo *Repository) IsOwner(ctx context.Context, userID int64) (bool, error) {
-	var role string
-	err := repo.db.QueryRow(ctx, `
-		SELECT role
-		FROM users
-		WHERE id = $1 AND is_active = true
-	`, userID).Scan(&role)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("find user role: %w", err)
-	}
-
-	return role == "OWNER", nil
-}
-
 func (repo *Repository) VoidPayment(ctx context.Context, code string, actorID int64) (Payment, error) {
 	id, err := paymentIDFromCode(code)
 	if err != nil {

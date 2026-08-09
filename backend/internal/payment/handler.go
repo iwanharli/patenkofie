@@ -131,17 +131,6 @@ func (handler *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	isOwner, err := handler.repo.IsOwner(r.Context(), userID)
-	if err != nil {
-		log.Error().Err(err).Msg("delete payment role check failed")
-		writeError(w, http.StatusInternalServerError, "ROLE_CHECK_FAILED", "Role pengguna gagal diperiksa")
-		return
-	}
-	if !isOwner {
-		writeError(w, http.StatusForbidden, "OWNER_ONLY", "Hanya OWNER yang dapat membatalkan/menghapus pembayaran")
-		return
-	}
-
 	code := chi.URLParam(r, "code")
 	item, err := handler.repo.VoidPayment(r.Context(), code, userID)
 	if errors.Is(err, ErrPaymentNotFound) {
@@ -161,17 +150,6 @@ func (handler *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	userID, ok := handler.currentUserID(r)
 	if !ok || userID == 0 {
 		writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "Session tidak valid")
-		return
-	}
-
-	isOwner, err := handler.repo.IsOwner(r.Context(), userID)
-	if err != nil {
-		log.Error().Err(err).Msg("update payment role check failed")
-		writeError(w, http.StatusInternalServerError, "ROLE_CHECK_FAILED", "Role pengguna gagal diperiksa")
-		return
-	}
-	if !isOwner {
-		writeError(w, http.StatusForbidden, "OWNER_ONLY", "Hanya OWNER yang dapat mengoreksi pembayaran")
 		return
 	}
 
@@ -210,17 +188,12 @@ func (handler *Handler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (handler *Handler) currentUserID(r *http.Request) (int64, bool) {
-	cookie, err := r.Cookie(auth.SessionCookieName)
-	if err != nil {
-		return 0, false
-	}
-
-	session, ok := handler.sessionStore.Get(cookie.Value)
+	actor, ok := auth.ActorFrom(r.Context())
 	if !ok {
 		return 0, false
 	}
 
-	return session.UserID, true
+	return actor.UserID, true
 }
 
 func paymentResponse(item Payment) map[string]any {

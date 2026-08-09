@@ -89,23 +89,6 @@ func (repo *Repository) FindByCode(ctx context.Context, code string) (Service, e
 	return item, nil
 }
 
-func (repo *Repository) IsOwner(ctx context.Context, userID int64) (bool, error) {
-	var role string
-	err := repo.db.QueryRow(ctx, `
-		SELECT role
-		FROM users
-		WHERE id = $1 AND is_active = true
-	`, userID).Scan(&role)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("find user role: %w", err)
-	}
-
-	return role == "OWNER", nil
-}
-
 func (repo *Repository) Update(ctx context.Context, code string, pricePerKg int64, isActive bool, updatedBy int64) error {
 	cmd, err := repo.db.Exec(ctx, `
 		UPDATE services

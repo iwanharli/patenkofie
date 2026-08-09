@@ -45,9 +45,10 @@ func main() {
 	defer db.Close()
 
 	sessionStore := auth.NewSessionStore(8 * time.Hour)
+	authRepo := auth.NewRepository(db)
 	auditHandler := auditpkg.NewHandler(auditpkg.NewRepository(db), sessionStore)
 	settingHandler := settingpkg.NewHandler(settingpkg.NewRepository(db), sessionStore, cfg.UploadDir, maxUploadBytes(cfg.MaxUploadMB))
-	authHandler := auth.NewHandler(auth.NewRepository(db), sessionStore)
+	authHandler := auth.NewHandler(authRepo, sessionStore)
 	customerHandler := customer.NewHandler(customer.NewRepository(db), sessionStore)
 	expenseHandler := expense.NewHandler(expense.NewRepository(db), sessionStore)
 	dashboardHandler := dashboard.NewHandler(dashboard.NewRepository(db), sessionStore)
@@ -91,56 +92,76 @@ func main() {
 		r.Get("/me", authHandler.Me)
 	})
 
-	router.Get("/api/v1/users", userHandler.List)
-	router.Post("/api/v1/users", userHandler.Create)
-	router.Get("/api/v1/users/{username}", userHandler.Detail)
-	router.Patch("/api/v1/users/{username}", userHandler.Update)
-	router.Post("/api/v1/users/{username}/reset-password", userHandler.ResetPassword)
-	router.Post("/api/v1/users/{username}/avatar", userHandler.UploadAvatar)
-	router.Patch("/api/v1/users/{username}/notification-settings", userHandler.UpdatePreferences)
+	// Routes any signed-in user (OWNER or STAFF) may reach. RequireAuth resolves
+	// the actor once and puts it in the request context.
+	router.Group(func(r chi.Router) {
+		r.Use(auth.RequireAuth(sessionStore, authRepo))
 
-	router.Get("/api/v1/notifications", notificationHandler.List)
-	router.Patch("/api/v1/notifications/read", notificationHandler.MarkAllAsRead)
+		r.Get("/api/v1/users", userHandler.List)
+		r.Get("/api/v1/users/{username}", userHandler.Detail)
+		r.Post("/api/v1/users/{username}/avatar", userHandler.UploadAvatar)
+		r.Patch("/api/v1/users/{username}/notification-settings", userHandler.UpdatePreferences)
 
-	router.Get("/api/v1/reports/overview", reportHandler.Overview)
-	router.Get("/api/v1/reports/detail", reportHandler.Detail)
-	router.Get("/api/v1/reports/export", reportHandler.ExportCSV)
-	router.Get("/api/v1/audit-logs", auditHandler.List)
-	router.Get("/api/v1/audit-logs/{id}", auditHandler.Detail)
+		r.Get("/api/v1/notifications", notificationHandler.List)
+		r.Patch("/api/v1/notifications/read", notificationHandler.MarkAllAsRead)
 
-	router.Get("/api/v1/settings/profile", settingHandler.GetProfile)
-	router.Patch("/api/v1/settings/profile", settingHandler.UpdateProfile)
-	router.Post("/api/v1/settings/profile/logo", settingHandler.UploadLogo)
-	router.Get("/api/v1/settings/backup", settingHandler.DownloadBackup)
+		r.Get("/api/v1/reports/overview", reportHandler.Overview)
+		r.Get("/api/v1/reports/detail", reportHandler.Detail)
+		r.Get("/api/v1/reports/export", reportHandler.ExportCSV)
 
-	router.Get("/api/v1/services", serviceHandler.List)
-	router.Get("/api/v1/services/{code}", serviceHandler.Detail)
-	router.Patch("/api/v1/services/{code}", serviceHandler.Update)
+		r.Get("/api/v1/settings/profile", settingHandler.GetProfile)
 
-	router.Get("/api/v1/expenses", expenseHandler.List)
-	router.Post("/api/v1/expenses", expenseHandler.Create)
-	router.Patch("/api/v1/expenses/{id}", expenseHandler.Update)
-	router.Delete("/api/v1/expenses/{id}", expenseHandler.Delete)
+		r.Get("/api/v1/services", serviceHandler.List)
+		r.Get("/api/v1/services/{code}", serviceHandler.Detail)
 
-	router.Get("/api/v1/dashboard", dashboardHandler.Overview)
-	router.Get("/api/v1/customers/suggestions", customerHandler.Suggestions)
-	router.Get("/api/v1/customers/{id}", customerHandler.Detail)
-	router.Patch("/api/v1/customers/{id}", customerHandler.Update)
-	router.Get("/api/v1/customers", customerHandler.List)
-	router.Get("/api/v1/orders", orderHandler.List)
-	router.Post("/api/v1/orders", orderHandler.Create)
-	router.Patch("/api/v1/orders/bulk-status", orderHandler.BulkUpdateStatus)
-	router.Get("/api/v1/orders/{code}", orderHandler.Detail)
-	router.Patch("/api/v1/orders/{code}", orderHandler.Update)
-	router.Post("/api/v1/orders/{code}/payments/settle", paymentHandler.SettleOrder)
-	router.Patch("/api/v1/orders/{code}/status", orderHandler.UpdateStatus)
-	router.Delete("/api/v1/orders/{code}", orderHandler.Delete)
-	router.Get("/api/v1/orders/{code}/pickup", pickupHandler.Detail)
-	router.Post("/api/v1/orders/{code}/pickup", pickupHandler.Create)
-	router.Get("/api/v1/payments", paymentHandler.List)
-	router.Get("/api/v1/payments/{code}", paymentHandler.Detail)
-	router.Patch("/api/v1/payments/{code}", paymentHandler.Update)
-	router.Delete("/api/v1/payments/{code}", paymentHandler.Delete)
+		r.Get("/api/v1/expenses", expenseHandler.List)
+		r.Post("/api/v1/expenses", expenseHandler.Create)
+
+		r.Get("/api/v1/dashboard", dashboardHandler.Overview)
+		r.Get("/api/v1/customers/suggestions", customerHandler.Suggestions)
+		r.Get("/api/v1/customers/{id}", customerHandler.Detail)
+		r.Patch("/api/v1/customers/{id}", customerHandler.Update)
+		r.Get("/api/v1/customers", customerHandler.List)
+		r.Get("/api/v1/orders", orderHandler.List)
+		r.Post("/api/v1/orders", orderHandler.Create)
+		r.Patch("/api/v1/orders/bulk-status", orderHandler.BulkUpdateStatus)
+		r.Get("/api/v1/orders/{code}", orderHandler.Detail)
+		r.Patch("/api/v1/orders/{code}", orderHandler.Update)
+		r.Post("/api/v1/orders/{code}/payments/settle", paymentHandler.SettleOrder)
+		r.Patch("/api/v1/orders/{code}/status", orderHandler.UpdateStatus)
+		r.Get("/api/v1/orders/{code}/pickup", pickupHandler.Detail)
+		r.Post("/api/v1/orders/{code}/pickup", pickupHandler.Create)
+		r.Get("/api/v1/payments", paymentHandler.List)
+		r.Get("/api/v1/payments/{code}", paymentHandler.Detail)
+	})
+
+	// Owner-only routes: account management, shop configuration, money
+	// corrections and the audit trail.
+	router.Group(func(r chi.Router) {
+		r.Use(auth.RequireAuth(sessionStore, authRepo))
+		r.Use(auth.RequireOwner)
+
+		r.Post("/api/v1/users", userHandler.Create)
+		r.Patch("/api/v1/users/{username}", userHandler.Update)
+		r.Post("/api/v1/users/{username}/reset-password", userHandler.ResetPassword)
+
+		r.Get("/api/v1/audit-logs", auditHandler.List)
+		r.Get("/api/v1/audit-logs/{id}", auditHandler.Detail)
+
+		r.Patch("/api/v1/settings/profile", settingHandler.UpdateProfile)
+		r.Post("/api/v1/settings/profile/logo", settingHandler.UploadLogo)
+		r.Get("/api/v1/settings/backup", settingHandler.DownloadBackup)
+
+		r.Patch("/api/v1/services/{code}", serviceHandler.Update)
+
+		r.Patch("/api/v1/expenses/{id}", expenseHandler.Update)
+		r.Delete("/api/v1/expenses/{id}", expenseHandler.Delete)
+
+		r.Delete("/api/v1/orders/{code}", orderHandler.Delete)
+		r.Patch("/api/v1/payments/{code}", paymentHandler.Update)
+		r.Delete("/api/v1/payments/{code}", paymentHandler.Delete)
+	})
+
 	router.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir(cfg.UploadDir))))
 
 	server := &http.Server{

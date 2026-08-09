@@ -26,23 +26,6 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 	return &Repository{db: db}
 }
 
-func (repo *Repository) IsOwner(ctx context.Context, userID int64) (bool, error) {
-	var role string
-	err := repo.db.QueryRow(ctx, `
-		SELECT role
-		FROM users
-		WHERE id = $1 AND is_active = true
-	`, userID).Scan(&role)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("find user role: %w", err)
-	}
-
-	return role == "OWNER", nil
-}
-
 func (repo *Repository) List(ctx context.Context, filter ListOrdersFilter) (OrderListResult, error) {
 	whereClauses := []string{"1 = 1"}
 	args := []any{}

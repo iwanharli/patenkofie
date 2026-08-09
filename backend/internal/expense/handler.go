@@ -24,15 +24,11 @@ func NewHandler(repo *Repository, sessionStore *auth.SessionStore) *Handler {
 }
 
 func (h *Handler) currentUserID(r *http.Request) (int64, bool) {
-	cookie, err := r.Cookie(auth.SessionCookieName)
-	if err != nil {
-		return 0, false
-	}
-	session, ok := h.sessionStore.Get(cookie.Value)
+	actor, ok := auth.ActorFrom(r.Context())
 	if !ok {
 		return 0, false
 	}
-	return session.UserID, true
+	return actor.UserID, true
 }
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
@@ -65,22 +61,6 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
-	userID, ok := h.currentUserID(r)
-	if !ok {
-		http.Error(w, `{"error":{"message":"Unauthorized"}}`, http.StatusUnauthorized)
-		return
-	}
-
-	isOwner, err := h.repo.IsOwner(r.Context(), userID)
-	if err != nil {
-		http.Error(w, `{"error":{"message":"Failed to verify role"}}`, http.StatusInternalServerError)
-		return
-	}
-	if !isOwner {
-		http.Error(w, `{"error":{"message":"Hanya OWNER yang dapat mengubah catatan kas kecil"}}`, http.StatusForbidden)
-		return
-	}
-
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
@@ -114,22 +94,6 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
-	userID, ok := h.currentUserID(r)
-	if !ok {
-		http.Error(w, `{"error":{"message":"Unauthorized"}}`, http.StatusUnauthorized)
-		return
-	}
-
-	isOwner, err := h.repo.IsOwner(r.Context(), userID)
-	if err != nil {
-		http.Error(w, `{"error":{"message":"Failed to verify role"}}`, http.StatusInternalServerError)
-		return
-	}
-	if !isOwner {
-		http.Error(w, `{"error":{"message":"Hanya OWNER yang dapat menghapus catatan kas kecil"}}`, http.StatusForbidden)
-		return
-	}
-
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
